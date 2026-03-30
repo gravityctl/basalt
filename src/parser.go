@@ -1,0 +1,90 @@
+package main
+
+import (
+	"bytes"
+	"os"
+	"regexp"
+	"strings"
+
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/parser"
+)
+
+// MarkdownParser handles conversion of markdown files to HTML
+type MarkdownParser struct {
+	markdown goldmark.Markdown
+}
+
+// NewMarkdownParser initializes the goldmark engine with GFM + task lists + typographer
+func NewMarkdownParser() *MarkdownParser {
+	return &MarkdownParser{
+		markdown: goldmark.New(
+			goldmark.WithExtensions(extension.GFM, extension.TaskList, extension.Typographer),
+			goldmark.WithParserOptions(
+				parser.WithAutoHeadingID(),
+			),
+		),
+	}
+}
+
+// ProcessFile reads a markdown file, extracts metadata and wiki-links,
+// then returns the title, rendered HTML body, and extracted link targets.
+func (p *MarkdownParser) ProcessFile(filePath string) (title string, htmlBody []byte, linkTargets []string, err error) {
+	rawContent, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	title = extractTitle(rawContent)
+	contentWithLinks, targets := extractWikiLinks(rawContent)
+	linkTargets = targets
+
+	// Strip frontmatter for rendering
+	contentToRender := removeFrontmatter(contentWithLinks)
+
+	// Convert Markdown to HTML
+	var buf bytes.Buffer
+	if err := p.markdown.Convert(contentToRender, &buf); err != nil {
+		return "", nil, nil, err
+	}
+
+	htmlBody = buf.Bytes()
+
+	// Rewrite .md links to .html
+	reLink := regexp.MustCompile(`\(([^)]*?\.md)\)`)
+	htmlBody = reLink.ReplaceAll(htmlBody, []byte("($1html)"))
+
+	return title, htmlBody, linkTargets, nil
+}
+
+// extractTitle gets the title from frontmatter, first H1, or falls back to filename
+func extractTitle(data []byte) string {
+	// 1. Frontmatter title
+	re := regexp.MustCompile(`(?s)^---\s*\n(.*?)\n---\n?`)
+	if matches := re.FindSubmatch(data); len(matches) > 0 {
+		yamlContent := string(matches[1])
+		for _, line := range strings.Split(yamlContent, "\n") {
+			if strings.HasPrefix(line, "title:") {
+				parts := strings.SplitN(line, ":", 2)
+				if len(parts) == 2 {
+					return strings.TrimSpace(parts[1])
+				}
+			}
+		}
+	}
+
+	// 2. First H1
+	h1Re := regexp.MustCompile(`(?m)^#\s+(.*)$`)
+	if matches := h1Re.FindSubmatch(data); len(matches) == 2 {
+		return strings.TrimSpace(string(matches[1]))
+	}
+
+	return "Untitled"
+}
+
+// removeFrontmatter strips YAML frontmatter from raw content
+func removeFrontmatter(data []byte) []byte {
+	re := regexp.MustCompile(`(?s)^---\s*\n.*?\n---\n?`)
+	return re.ReplaceAll(data, []byte{})
+}
