@@ -11,8 +11,8 @@ import (
 
 // Config — adjust these to match your vault layout
 const (
-	SourceDir = "../vault"
-	OutputDir = "../output"
+	SourceDir = "../vault"   // Your Obsidian folder
+	OutputDir = "../output"  // Where the static site goes
 )
 
 func main() {
