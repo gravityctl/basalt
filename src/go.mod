@@ -1,5 +1,5 @@
 module basalt
 
-go 1.25.0
+go 1.21
 
-require github.com/yuin/goldmark v1.8.1
+require github.com/yuin/goldmark v1.7.4
