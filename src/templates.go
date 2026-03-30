@@ -57,6 +57,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         </div>
         %s
     <script>
+    window.pageGraphData = %s;
     (function() {
         var container = document.getElementById("local-graph");
         if (!container || !window.pageGraphData) return;
