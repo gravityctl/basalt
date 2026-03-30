@@ -49,7 +49,7 @@ func (p *MarkdownParser) ProcessFile(filePath, sourceRelPath string) (title stri
 	// Convert Markdown to HTML
 	var buf bytes.Buffer
 	if err := p.markdown.Convert(contentToRender, &buf); err != nil {
-		return "", nil, nil, err
+		return "", nil, nil, nil, err
 	}
 
 	htmlBody = buf.Bytes()
