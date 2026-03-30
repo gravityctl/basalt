@@ -181,7 +181,7 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 	}
 
 	// Store backlinks for per-page graph queries
-	backlinksJSON, _ := json.MarshalIndent(backlinks, "", "  ")
+	backlinksJSON, _ := json.Marshal(backlinks)
 	os.WriteFile(filepath.Join(vaultDir, "..", "output", "backlinks.json"), backlinksJSON, 0644)
 
 	return g, backlinks, nil
