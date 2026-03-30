@@ -83,6 +83,11 @@ func extractTitle(data []byte) string {
 	return "Untitled"
 }
 
+// toHTMLName converts a markdown file path to an HTML-safe name (strips .md extension)
+func toHTMLName(mdPath string) string {
+	return strings.TrimSuffix(filepath.Base(mdPath), ".md")
+}
+
 // removeFrontmatter strips YAML frontmatter from raw content
 func removeFrontmatter(data []byte) []byte {
 	re := regexp.MustCompile(`(?s)^---\s*\n.*?\n---\n?`)
