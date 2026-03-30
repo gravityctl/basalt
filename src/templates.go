@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 )
@@ -58,6 +60,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         %s
         <div id="local-graph"></div>
     </main>
+        <script src="../graph/d3.min.js"></script>
     <script>
     window.pageGraphData = %s; if (!window.pageGraphData || typeof window.pageGraphData !== "object") { window.pageGraphData = { links: [], backlinks: [] }; }
     (function() {
@@ -74,58 +77,29 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         data.links.forEach(function(l) { edges.push({ source: pageId, target: l.href.replace(".html", "") }); });
         data.backlinks.forEach(function(bl) { edges.push({ source: bl.href.replace(".html", ""), target: pageId }); });
         var width = container.clientWidth, height = 300;
-        var svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svgEl.setAttribute("width", width); svgEl.setAttribute("height", height);
-        container.appendChild(svgEl);
-        var simNodes = nodes.map(function(n) { return {id: n.id, title: n.title, stub: n.stub, current: n.current, x: width/2 + (Math.random()-0.5)*80, y: height/2 + (Math.random()-0.5)*80}; });
-        var simEdges = edges.map(function(e) { return {source: e.source, target: e.target}; });
-        function tick() {
-            var lx = simNodes.map(function(n){ return n.x; }), ly = simNodes.map(function(n){ return n.y; });
-            for (var i = 0; i < simNodes.length; i++) {
-                for (var j = 0; j < simNodes.length; j++) {
-                    if (i === j) continue;
-                    var dx = lx[i]-lx[j], dy = ly[i]-ly[j], dist = Math.sqrt(dx*dx+dy*dy)||1;
-                    lx[i] += dx/dist*100/dist; ly[i] += dy/dist*100/dist;
-                }
-            }
-            for (var e = 0; e < simEdges.length; e++) {
-                var si = simNodes.findIndex(function(n){ return n.id === simEdges[e].source; });
-                var ti = simNodes.findIndex(function(n){ return n.id === simEdges[e].target; });
-                if (si < 0 || ti < 0) continue;
-                var dx = lx[ti]-lx[si], dy = ly[ti]-ly[si], dist = Math.sqrt(dx*dx+dy*dy)||1, f=(dist-80)*0.04;
-                lx[si]+=dx/dist*f; ly[si]+=dy/dist*f; lx[ti]-=dx/dist*f; ly[ti]-=dy/dist*f;
-            }
-            for (var i = 0; i < simNodes.length; i++) { lx[i]+=(width/2-lx[i])*0.02; ly[i]+=(height/2-ly[i])*0.02; }
-            for (var i = 0; i < simNodes.length; i++) { simNodes[i].x=lx[i]; simNodes[i].y=ly[i]; }
-            while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
-            for (var e = 0; e < simEdges.length; e++) {
-                var si = simNodes.findIndex(function(n){ return n.id === simEdges[e].source; });
-                var ti = simNodes.findIndex(function(n){ return n.id === simEdges[e].target; });
-                if (si < 0 || ti < 0) continue;
-                var line = document.createElementNS("http://www.w3.org/2000/svg","line");
-                line.setAttribute("x1",simNodes[si].x); line.setAttribute("y1",simNodes[si].y);
-                line.setAttribute("x2",simNodes[ti].x); line.setAttribute("y2",simNodes[ti].y);
-                line.setAttribute("stroke","#ccc"); line.setAttribute("stroke-width","1.5");
-                svgEl.appendChild(line);
-            }
-            for (var i = 0; i < simNodes.length; i++) {
-                var g = document.createElementNS("http://www.w3.org/2000/svg","g");
-                g.setAttribute("transform","translate("+simNodes[i].x+","+simNodes[i].y+")");
-                g.style.cursor = simNodes[i].stub ? "default" : "pointer";
-                if (!simNodes[i].stub && !simNodes[i].current) { (function(n){ g.addEventListener("click", function(){ window.location.href = n.id+".html"; }); })(simNodes[i]); }
-                var circle = document.createElementNS("http://www.w3.org/2000/svg","circle");
-                circle.setAttribute("r", simNodes[i].current ? 10 : 6);
-                circle.setAttribute("fill", simNodes[i].stub ? "#e67e22" : (simNodes[i].current ? "#2980b9" : "#3498db"));
-                circle.setAttribute("stroke", "white"); circle.setAttribute("stroke-width", "2");
-                g.appendChild(circle);
-                var text = document.createElementNS("http://www.w3.org/2000/svg","text");
-                text.setAttribute("dx", 12); text.setAttribute("dy", 4);
-                text.setAttribute("font-size", "11"); text.setAttribute("fill", "#333"); text.textContent = simNodes[i].title;
-                g.appendChild(text);
-                svgEl.appendChild(g);
-            }
-        }
-        for (var t = 0; t < 150; t++) tick();
+        var svg = d3.select(container).append("svg").attr("width", width).attr("height", height);
+        var simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(edges).id(function(d) { return d.id; }).distance(60))
+            .force("charge", d3.forceManyBody().strength(-150))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collision", d3.forceCollide().radius(25));
+        var link = svg.append("g").selectAll("line").data(edges).enter().append("line").style("stroke", "#ccc").style("stroke-width", 1.5);
+        var node = svg.append("g").selectAll("g").data(nodes).enter().append("g").attr("class", "node")
+            .call(d3.drag()
+                .on("start", function(s) { if (!s.active) simulation.alphaTarget(0.3).restart(); s.subject.fx = s.subject.x; s.subject.fy = s.subject.y; })
+                .on("drag", function(s) { s.subject.fx = s.x; s.subject.fy = s.y; })
+                .on("end", function(s) { if (!s.active) simulation.alphaTarget(0); s.subject.fx = null; s.subject.fy = null; }));
+        node.append("circle").attr("r", function(d) { return d.current ? 10 : 6; })
+            .style("fill", function(d) { return d.stub ? "#e67e22" : (d.current ? "#2980b9" : "#3498db"); })
+            .style("stroke", "white").style("stroke-width", 2);
+        node.append("text").attr("dx", 10).attr("dy", 4).style("font-size", "11px").style("fill", "#333").text(function(d) { return d.title; });
+        node.on("click", function(event, d) { if (!d.stub && !d.current) window.location.href = d.id + ".html"; });
+        node.on("mouseover", function(event, d) { link.style("stroke", function(l) { return (l.source.id === d.id || l.target.id === d.id) ? "#2980b9" : "#ccc"; }); });
+        node.on("mouseout", function() { link.style("stroke", "#ccc"); });
+        simulation.on("tick", function() {
+            link.attr("x1", function(d) { return d.source.x; }).attr("y1", function(d) { return d.source.y; }).attr("x2", function(d) { return d.target.x; }).attr("y2", function(d) { return d.target.y; });
+            node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+        });
     })();
     </script>
 </body>
@@ -196,10 +170,30 @@ func generateStubHTML(pageID string) string {
 }
 
 // writeGraphViewer writes the full vault D3 graph viewer and per-page graph script.
-// graphJSON is embedded inline so the page works without a server (no CORS/fetch issues).
+// Downloads D3 from CDN and saves it locally to graphDir/d3.min.js so
+// per-page graphs work without needing a server or network access.
 func writeGraphViewer(graphDir string, graphJSON []byte) {
+	downloadD3(graphDir)
 	writeFullGraphViewer(graphDir, graphJSON)
 	writeLocalGraphScript(graphDir)
+}
+
+// downloadD3 fetches D3 from CDN and saves it locally to graphDir/d3.min.js
+func downloadD3(graphDir string) {
+	d3Path := filepath.Join(graphDir, "d3.min.js")
+	if _, err := os.Stat(d3Path); err == nil {
+		return // already exists, skip
+	}
+	resp, err := http.Get("https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js")
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	os.WriteFile(d3Path, data, 0644)
 }
 
 func writeFullGraphViewer(graphDir string, graphJSON []byte) {
