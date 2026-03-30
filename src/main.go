@@ -1,218 +1,176 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
-
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/extension"
-	//"github.com/yuin/goldmark/renderer/html"
-	"github.com/yuin/goldmark/parser"
 )
 
-// Configuration
+// Config — adjust these to match your vault layout
 const (
-	SourceDir = "../vault"   // Your Obsidian folder
-	OutputDir = "../output"  // Where the static site goes
+	SourceDir = "../vault"
+	OutputDir = "../output"
 )
-
-// MarkdownParser handles the conversion logic
-type MarkdownParser struct {
-	markdown goldmark.Markdown
-}
-
-// NewMarkdownParser initializes the goldmark engine
-func NewMarkdownParser() *MarkdownParser {
-	return &MarkdownParser{
-		markdown: goldmark.New(
-			goldmark.WithExtensions(extension.GFM, extension.TaskList, extension.Typographer),
-			goldmark.WithParserOptions(
-				parser.WithAutoHeadingID(),
-			),
-		),
-	}
-}
-
-// ProcessFile reads a markdown file, extracts metadata, and returns HTML
-func (p *MarkdownParser) ProcessFile(filePath string) (string, string, error) {
-	rawContent, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", "", err
-	}
-
-	title := extractTitle(rawContent)
-	contentToRender := removeFrontmatter(rawContent)
-
-	// Convert Markdown to HTML
-	var buf bytes.Buffer
-	if err := p.markdown.Convert(contentToRender, &buf); err != nil {
-		return "", "", err
-	}
-
-	htmlContent := buf.String()
-
-	// CRITICAL: Rewrite internal links from .md to .html
-	// This regex finds links like [text](filename.md) and replaces .md with .html
-	reLink := regexp.MustCompile(`\(([^)]*?\.md)\)`)
-	htmlContent = reLink.ReplaceAllString(htmlContent, "($1html)")
-
-	return title, htmlContent, nil
-}
-
-// Helper: Extract title from Frontmatter or file
-func extractTitle(data []byte) string {
-	// 1. Check for YAML Frontmatter
-	re := regexp.MustCompile(`^---\s(.*\s)*---`)
-	matches := re.FindSubmatch(data)
-	if len(matches) > 1 {
-		yamlContent := string(matches[1])
-		lines := strings.Split(yamlContent, "\n")
-		for _, line := range lines {
-			if strings.HasPrefix(line, "title:") {
-				parts := strings.SplitN(line, ":", 2)
-				if len(parts) == 2 {
-          fmt.Printf("Thing '%s'.\n", strings.TrimSpace(parts[1]))
-					return strings.TrimSpace(parts[1])
-				}
-			}
-		}
-	}
-
-	// 2. Fallback: First H1 in document
-	h1Re := regexp.MustCompile(`^#\s+(.*)$`)
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	for scanner.Scan() {
-		line := scanner.Text()
-		if matches := h1Re.FindStringSubmatch(line); len(matches) == 2 {
-			return strings.TrimSpace(matches[1])
-		}
-	}
-
-	// 3. Fallback: Filename
-	return strings.TrimSuffix(filepath.Base("error"), ".md")
-}
-
-// Helper: Remove frontmatter for rendering
-func removeFrontmatter(data []byte) []byte {
-	re := regexp.MustCompile(`(?s)^---\s*\n.*?\n---\n?`)
-	return re.ReplaceAll(data, []byte{})
-}
-
-// Helper: Clean filename for HTML
-func toHTMLName(mdPath string) string {
-	base := strings.TrimSuffix(filepath.Base(mdPath), ".md")
-	return base + ".html"
-}
 
 func main() {
-	parser := NewMarkdownParser()
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
 
-	// Check if source exists
+func run() error {
 	if _, err := os.Stat(SourceDir); os.IsNotExist(err) {
-		fmt.Printf("Error: Source directory '%s' not found.\n", SourceDir)
-		fmt.Println("Please create this folder and add your Obsidian .md files.")
-		return
+		return fmt.Errorf("source directory %q not found", SourceDir)
 	}
 
-	// Create output directory
-	err := os.MkdirAll(OutputDir, 0755)
-	if err != nil {
-		fmt.Printf("Error creating output directory: %v\n", err)
-		return
+	if err := os.MkdirAll(OutputDir, 0755); err != nil {
+		return fmt.Errorf("creating output dir: %w", err)
+	}
+
+	graphDir := filepath.Join(OutputDir, "graph")
+	if err := os.MkdirAll(graphDir, 0755); err != nil {
+		return fmt.Errorf("creating graph dir: %w", err)
 	}
 
 	fmt.Println("Building Basalt Site...")
 
-	// Walk through the directory
+	// Build full vault graph (computes all pages, edges, writes backlinks.json)
+	graph, _, pageTitles, err := buildGraph(SourceDir)
+	if err != nil {
+		return fmt.Errorf("building graph: %w", err)
+	}
+
+	graphJSON, err := json.MarshalIndent(graph, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshaling graph: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(OutputDir, "graph.json"), graphJSON, 0644); err != nil {
+		return fmt.Errorf("writing graph.json: %w", err)
+	}
+	fmt.Printf("Graph: %d nodes, %d edges\n", len(graph.Nodes), len(graph.Edges))
+
+	// Load the set of all existing pages for stub detection
+	existingPages := make(map[string]bool)
+	for _, node := range graph.Nodes {
+		if !node.Stub {
+			existingPages[node.ID] = true
+		}
+	}
+
+	// Load backlinks map for per-page backlink lookup
+	backlinksMap := loadBacklinks()
+
+	parser := NewMarkdownParser()
+
+	// Walk the vault and generate HTML for each markdown file
 	err = filepath.Walk(SourceDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-
-		// Only process .md files
 		if !strings.HasSuffix(path, ".md") {
 			return nil
 		}
 
-		// Process content
-		title, htmlBody, err := parser.ProcessFile(path)
+		relPath, _ := filepath.Rel(SourceDir, path)
+
+		title, htmlBody, linkTargets, linkHrefs, err := parser.ProcessFile(path, relPath)
 		if err != nil {
 			fmt.Printf("Error processing %s: %v\n", path, err)
-			return nil // skip file and continue
+			return nil
 		}
 
-		// Generate Output Filename
-		relPath, _ := filepath.Rel(SourceDir, path)
-		outputDir := filepath.Join(OutputDir, filepath.Dir(relPath))
-		os.MkdirAll(outputDir, 0755)
-
-		outputFile := filepath.Join(outputDir, toHTMLName(relPath))
-
-		// Generate the HTML Template
-		finalHTML := generateHTMLTemplate(title, htmlBody, relPath)
-
-		// Write to disk
-		err = os.WriteFile(outputFile, []byte(finalHTML), 0644)
-		if err != nil {
-			return err
+		pageID := filepath.Join(filepath.Dir(relPath), toHTMLName(relPath))
+		outputSubdir := filepath.Join(OutputDir, filepath.Dir(relPath))
+		if merr := os.MkdirAll(outputSubdir, 0755); merr != nil {
+			return merr
 		}
 
-		fmt.Printf("Generated: %s -> %s\n", relPath, outputFile)
+		// Build per-page graph data
+		pageGraph := buildPageGraph(pageID, linkTargets, linkHrefs, backlinksMap, existingPages, pageTitles)
+
+		// Write HTML page
+		outputFile := filepath.Join(OutputDir, pageID+".html")
+		html := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraph)
+		if werr := os.WriteFile(outputFile, []byte(html), 0644); werr != nil {
+			return werr
+		}
+		fmt.Printf("Generated: %s\n", outputFile)
 
 		return nil
 	})
-
 	if err != nil {
-		fmt.Printf("Walk error: %v\n", err)
+		return fmt.Errorf("walking vault: %w", err)
 	}
 
+	// Generate stub pages for dead link targets
+	stubCount := 0
+	for _, node := range graph.Nodes {
+		if node.Stub {
+			stubFile := filepath.Join(OutputDir, node.ID+".html")
+			if err := os.WriteFile(stubFile, []byte(generateStubHTML(node.ID)), 0644); err != nil {
+				return err
+			}
+			fmt.Printf("Stubbed: %s\n", stubFile)
+			stubCount++
+		}
+	}
+	if stubCount > 0 {
+		fmt.Printf("Generated %d stub pages\n", stubCount)
+	}
+
+	writeGraphViewer(graphDir, graphJSON)
 	fmt.Println("Build complete.")
+	return nil
 }
 
-// generateHTMLTemplate creates a simple, clean HTML wrapper
-func generateHTMLTemplate(title string, content string, sourcePath string) string {
-	css := `
-	:root { --bg: #f8f8f8; --text: #333; --link: #2980b9; }
-	body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 850px; margin: 0 auto; padding: 20px; background: var(--bg); color: var(--text); }
-	h1 { border-bottom: 1px solid #e1e4e8; padding-bottom: 10px; }
-	a { color: var(--link); text-decoration: none; font-weight: 500; }
-	a:hover { text-decoration: underline; }
-	nav { margin-bottom: 20px; font-size: 0.85em; color: #666; }
-	.content { margin-top: 20px; }
-	.markdown-body { background: white; padding: 30px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-	p, li { font-size: 16px; }
-	h2 { margin-top: 30px; }
-	`
+// buildPageGraph builds the per-page graph data for a given page:
+// - Links: pages this page wiki-links to
+// - Backlinks: pages that link to this page
+func buildPageGraph(pageID string, linkTargets []string, linkHrefs []string, backlinksMap map[string][]string, existingPages map[string]bool, pageTitles map[string]string) *PageGraph {
+	pg := &PageGraph{Links: []GraphRef{}, Backlinks: []GraphRef{}}
 
-	navHTML := ""
-	if sourcePath != "" {
-		navHTML = fmt.Sprintf("<nav>Source: <code>%s</code></nav>", sourcePath)
+	// Build Links — use linkHrefs (computed relative hrefs) not bare target paths
+	for i, target := range linkTargets {
+		href := target + ".html" // fallback
+		if i < len(linkHrefs) {
+			href = linkHrefs[i] + ".html"
+		}
+		pg.Links = append(pg.Links, GraphRef{
+			Title: toHTMLName(target),
+			Href:  href,
+			Stub:  !existingPages[target],
+		})
 	}
 
-	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s - Basalt</title>
-    <style>%s</style>
-</head>
-<body>
-    <header>
-        <h1>%s</h1>
-        %s
-    </header>
-    <main class="content">
-        <div class="markdown-body">
-            %s
-        </div>
-    </main>
-</body>
-</html>`, title, css, title, navHTML, content)
+	// Build Backlinks — compute relative hrefs from this page's directory
+	for _, source := range backlinksMap[pageID] {
+		title := toHTMLName(source)
+		if t, ok := pageTitles[source]; ok && t != "" {
+			title = t
+		}
+		pg.Backlinks = append(pg.Backlinks, GraphRef{
+			Title: title,
+			Href:  computeRelHref(pageID, source),
+			Stub:  !existingPages[source],
+		})
+	}
+
+	return pg
+}
+
+// loadBacklinks reads the backlinks map from backlinks.json
+func loadBacklinks() map[string][]string {
+	var m map[string][]string
+	data, err := os.ReadFile(filepath.Join(OutputDir, "backlinks.json"))
+	if err != nil {
+		return make(map[string][]string)
+	}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return make(map[string][]string)
+	}
+	return m
 }
