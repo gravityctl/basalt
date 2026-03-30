@@ -130,13 +130,14 @@ func generateStubHTML(pageID string) string {
 </html>`, pageID, pageID, pageID)
 }
 
-// writeGraphViewer writes the full vault D3 graph viewer and per-page graph script
-func writeGraphViewer(graphDir string, nodeCount int) {
-	writeFullGraphViewer(graphDir)
+// writeGraphViewer writes the full vault D3 graph viewer and per-page graph script.
+// graphJSON is embedded inline so the page works without a server (no CORS/fetch issues).
+func writeGraphViewer(graphDir string, graphJSON []byte) {
+	writeFullGraphViewer(graphDir, graphJSON)
 	writeLocalGraphScript(graphDir)
 }
 
-func writeFullGraphViewer(graphDir string) {
+func writeFullGraphViewer(graphDir string, graphJSON []byte) {
 	html := `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -171,7 +172,11 @@ func writeFullGraphViewer(graphDir string) {
     <div id="graph"></div>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script>
-    d3.json("graph.json").then(function(graph) {
+    // Embedded graph data — avoids CORS issues when opening via file://
+    const graph = %s;
+    renderGraph(graph);
+
+    function renderGraph(graph) {
         const width = document.getElementById("graph").clientWidth;
         const height = document.getElementById("graph").clientHeight;
 
@@ -240,11 +245,11 @@ func writeFullGraphViewer(graphDir string) {
             event.subject.fx = null;
             event.subject.fy = null;
         }
-    });
+    }
     </script>
 </body>
 </html>`
-	os.WriteFile(filepath.Join(graphDir, "index.html"), []byte(html), 0644)
+	os.WriteFile(filepath.Join(graphDir, "index.html"), []byte(fmt.Sprintf(html, graphJSON)), 0644)
 }
 
 func writeLocalGraphScript(graphDir string) {

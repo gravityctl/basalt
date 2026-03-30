@@ -122,7 +122,7 @@ func run() error {
 		fmt.Printf("Generated %d stub pages\n", stubCount)
 	}
 
-	writeGraphViewer(graphDir, len(graph.Nodes))
+	writeGraphViewer(graphDir, graphJSON)
 	fmt.Println("Build complete.")
 	return nil
 }
