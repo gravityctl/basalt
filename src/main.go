@@ -77,7 +77,7 @@ func run() error {
 
 		relPath, _ := filepath.Rel(SourceDir, path)
 
-		title, htmlBody, linkTargets, err := parser.ProcessFile(path, relPath)
+		title, htmlBody, linkTargets, linkHrefs, err := parser.ProcessFile(path, relPath)
 		if err != nil {
 			fmt.Printf("Error processing %s: %v\n", path, err)
 			return nil
@@ -90,7 +90,7 @@ func run() error {
 		}
 
 		// Build per-page graph data
-		pageGraph := buildPageGraph(pageID, linkTargets, backlinksMap, existingPages)
+		pageGraph := buildPageGraph(pageID, linkTargets, linkHrefs, backlinksMap, existingPages)
 
 		// Write HTML page
 		outputFile := filepath.Join(OutputDir, pageID+".html")
@@ -130,14 +130,18 @@ func run() error {
 // buildPageGraph builds the per-page graph data for a given page:
 // - Links: pages this page wiki-links to
 // - Backlinks: pages that link to this page
-func buildPageGraph(pageID string, linkTargets []string, backlinksMap map[string][]string, existingPages map[string]bool) *PageGraph {
+func buildPageGraph(pageID string, linkTargets []string, linkHrefs []string, backlinksMap map[string][]string, existingPages map[string]bool) *PageGraph {
 	pg := &PageGraph{Links: []GraphRef{}, Backlinks: []GraphRef{}}
 
-	// Build Links
-	for _, target := range linkTargets {
+	// Build Links — use linkHrefs (computed relative hrefs) not bare target paths
+	for i, target := range linkTargets {
+		href := target + ".html" // fallback
+		if i < len(linkHrefs) {
+			href = linkHrefs[i] + ".html"
+		}
 		pg.Links = append(pg.Links, GraphRef{
 			Title: toHTMLName(target),
-			Href:  target + ".html",
+			Href:  href,
 			Stub:  !existingPages[target],
 		})
 	}

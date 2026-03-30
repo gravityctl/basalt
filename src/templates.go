@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 )
@@ -57,8 +55,8 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         <div class="markdown-body">
             %s
         </div>
-        %s
         <div id="local-graph"></div>
+        %s
     </main>
         <script src="../graph/d3.min.js"></script>
     <script>
@@ -176,24 +174,6 @@ func writeGraphViewer(graphDir string, graphJSON []byte) {
 	downloadD3(graphDir)
 	writeFullGraphViewer(graphDir, graphJSON)
 	writeLocalGraphScript(graphDir)
-}
-
-// downloadD3 fetches D3 from CDN and saves it locally to graphDir/d3.min.js
-func downloadD3(graphDir string) {
-	d3Path := filepath.Join(graphDir, "d3.min.js")
-	if _, err := os.Stat(d3Path); err == nil {
-		return // already exists, skip
-	}
-	resp, err := http.Get("https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js")
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-	os.WriteFile(d3Path, data, 0644)
 }
 
 func writeFullGraphViewer(graphDir string, graphJSON []byte) {

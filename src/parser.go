@@ -30,17 +30,18 @@ func NewMarkdownParser() *MarkdownParser {
 }
 
 // ProcessFile reads a markdown file, extracts metadata and wiki-links,
-// then returns the title, rendered HTML body, and extracted link targets.
+// then returns the title, rendered HTML body, link targets, and computed rel hrefs.
 // sourceRelPath is the vault-relative path of this file (e.g. "recipes/index.md").
-func (p *MarkdownParser) ProcessFile(filePath, sourceRelPath string) (title string, htmlBody []byte, linkTargets []string, err error) {
+func (p *MarkdownParser) ProcessFile(filePath, sourceRelPath string) (title string, htmlBody []byte, linkTargets []string, linkHrefs []string, err error) {
 	rawContent, err := os.ReadFile(filePath)
 	if err != nil {
-		return "", nil, nil, err
+		return "", nil, nil, nil, err
 	}
 
 	title = extractTitle(rawContent)
-	contentWithLinks, targets := extractWikiLinks(rawContent, sourceRelPath)
+	contentWithLinks, targets, rels := extractWikiLinks(rawContent, sourceRelPath)
 	linkTargets = targets
+	linkHrefs = rels
 
 	// Strip frontmatter for rendering
 	contentToRender := removeFrontmatter(contentWithLinks)
@@ -57,7 +58,7 @@ func (p *MarkdownParser) ProcessFile(filePath, sourceRelPath string) (title stri
 	reLink := regexp.MustCompile(`\(([^)]*?\.md)\)`)
 	htmlBody = reLink.ReplaceAll(htmlBody, []byte("($1html)"))
 
-	return title, htmlBody, linkTargets, nil
+	return title, htmlBody, linkTargets, linkHrefs, nil
 }
 
 // extractTitle gets the title from frontmatter, first H1, or falls back to filename

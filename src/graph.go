@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -46,10 +48,11 @@ var wikiLinkRe = regexp.MustCompile(`\[\[([^\]|]+)(?:\|([^\]]+))?\]\]`)
 
 // extractWikiLinks extracts all wiki-style links from content.
 // sourceRelPath is the relative path of the source file within the vault (e.g. "recipes/index.md").
-// It returns the cleaned content (wiki links → markdown links) and the raw link targets.
-// Href paths are computed relative to the source file's directory in the output.
-func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string) {
-	links := []string{}
+// Returns the cleaned content (wiki links → markdown links), raw link targets, and the computed
+// relative hrefs for each link (matching the href used in the markdown output).
+func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string, []string) {
+	targets := []string{}
+	rels := []string{}
 
 	processed := wikiLinkRe.ReplaceAllFunc(content, func(match []byte) []byte {
 		matches := wikiLinkRe.FindSubmatch(match)
@@ -62,7 +65,7 @@ func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string) {
 			display = string(matches[2])
 		}
 
-		links = append(links, target)
+		targets = append(targets, target)
 
 		// Compute href relative to source file's directory in output.
 		// sourcePageID e.g. "recipes/index" (no extension)
@@ -76,6 +79,7 @@ func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string) {
 		if err != nil {
 			rel = targetBase
 		}
+		rels = append(rels, rel)
 
 		// Build display text: use filename only (toHTMLName), or explicit display text if provided
 		linkDisplay := toHTMLName(target)
@@ -86,7 +90,7 @@ func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string) {
 		return []byte("[" + linkDisplay + "](" + rel + ".html)")
 	})
 
-	return processed, links
+	return processed, targets, rels
 }
 
 // buildGraph walks the vault and builds the complete link graph.
@@ -132,7 +136,7 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 			return nil
 		}
 
-		_, targets := extractWikiLinks(data, relPath)
+		_, targets, _ := extractWikiLinks(data, relPath)
 
 		// Add edges
 		for _, target := range targets {
@@ -190,12 +194,28 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 // pageIDFromRelPath converts a vault-relative path (e.g. "recipes/index.md")
 // to a page ID (e.g. "recipes/index") preserving directory structure.
 func pageIDFromRelPath(relPath string) string {
-	// relPath is like "recipes/index.md"
-	// pageID should be "recipes/index"
-	dir := filepath.Dir(relPath)        // "recipes"
-	base := toHTMLName(relPath)          // "index" (strips .md)
+	dir := filepath.Dir(relPath) // "recipes"
+	base := toHTMLName(relPath)    // "index" (strips .md)
 	if dir == "." {
 		return base
 	}
 	return filepath.Join(dir, base)
+}
+
+// downloadD3 fetches D3 from CDN and saves it locally to graphDir/d3.min.js
+func downloadD3(graphDir string) {
+	d3Path := filepath.Join(graphDir, "d3.min.js")
+	if _, err := os.Stat(d3Path); err == nil {
+		return // already exists, skip
+	}
+	resp, err := http.Get("https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js")
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	os.WriteFile(d3Path, data, 0644)
 }
