@@ -11,8 +11,8 @@ import (
 
 // Config — adjust these to match your vault layout
 const (
-	SourceDir = "../vault"   // Your Obsidian folder
-	OutputDir = "../output"  // Where the static site goes
+	SourceDir = "../vault"
+	OutputDir = "../output"
 )
 
 func main() {
@@ -38,19 +38,31 @@ func run() error {
 
 	fmt.Println("Building Basalt Site...")
 
-	// Build full vault graph
+	// Build full vault graph (computes all pages, edges, writes backlinks.json)
 	graph, pageLinks, err := buildGraph(SourceDir)
 	if err != nil {
 		return fmt.Errorf("building graph: %w", err)
 	}
 
-	if err := writeGraphJSON(graph); err != nil {
+	graphJSON, err := json.MarshalIndent(graph, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshaling graph: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(OutputDir, "graph.json"), graphJSON, 0644); err != nil {
 		return fmt.Errorf("writing graph.json: %w", err)
 	}
 	fmt.Printf("Graph: %d nodes, %d edges\n", len(graph.Nodes), len(graph.Edges))
 
-	// Track pages we generate so we know which graph targets are stubs
-	generatedPages := make(map[string]bool)
+	// Load the set of all existing pages for stub detection
+	existingPages := make(map[string]bool)
+	for _, node := range graph.Nodes {
+		if !node.Stub {
+			existingPages[node.ID] = true
+		}
+	}
+
+	// Load backlinks map for per-page backlink lookup
+	backlinksMap := loadBacklinks()
 
 	parser := NewMarkdownParser()
 
@@ -66,21 +78,19 @@ func run() error {
 		title, htmlBody, linkTargets, err := parser.ProcessFile(path)
 		if err != nil {
 			fmt.Printf("Error processing %s: %v\n", path, err)
-			return nil // skip and continue
+			return nil
 		}
 
 		relPath, _ := filepath.Rel(SourceDir, path)
-		// Preserve subdirectory: recipes/index.md -> recipes/index
 		pageID := filepath.Join(filepath.Dir(relPath), toHTMLName(relPath))
 
-		// Ensure output directory exists for this page
 		outputSubdir := filepath.Join(OutputDir, filepath.Dir(relPath))
 		if err := os.MkdirAll(outputSubdir, 0755); err != nil {
 			return err
 		}
 
-		// Per-page graph data
-		pageGraph := buildPageGraph(pageID, linkTargets, pageLinks, generatedPages)
+		// Build per-page graph data
+		pageGraph := buildPageGraph(pageID, linkTargets, backlinksMap, existingPages)
 
 		// Write HTML page
 		outputFile := filepath.Join(OutputDir, pageID+".html")
@@ -89,7 +99,6 @@ func run() error {
 			return err
 		}
 		fmt.Printf("Generated: %s\n", outputFile)
-		generatedPages[pageID] = true
 
 		return nil
 	})
@@ -100,12 +109,12 @@ func run() error {
 	// Generate stub pages for dead link targets
 	stubCount := 0
 	for _, node := range graph.Nodes {
-		if node.Stub && !generatedPages[node.ID] {
+		if node.Stub {
 			stubFile := filepath.Join(OutputDir, node.ID+".html")
 			if err := os.WriteFile(stubFile, []byte(generateStubHTML(node.ID)), 0644); err != nil {
 				return err
 			}
-			fmt.Printf("Stubbed: %s (dead link target)\n", stubFile)
+			fmt.Printf("Stubbed: %s\n", stubFile)
 			stubCount++
 		}
 	}
@@ -113,38 +122,27 @@ func run() error {
 		fmt.Printf("Generated %d stub pages\n", stubCount)
 	}
 
-	// Write D3 graph viewer
 	writeGraphViewer(graphDir, len(graph.Nodes))
 	fmt.Println("Build complete.")
 	return nil
 }
 
-// writeGraphJSON writes the full vault graph as JSON
-func writeGraphJSON(g *Graph) error {
-	graphJSON, err := json.MarshalIndent(g, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(OutputDir, "graph.json"), graphJSON, 0644)
-}
-
-// buildPageGraph constructs per-page graph data (links + backlinks) for a given page
-func buildPageGraph(pageID string, linkTargets []string, pageLinks map[string][]string, generatedPages map[string]bool) *PageGraph {
+// buildPageGraph builds the per-page graph data for a given page:
+// - Links: pages this page wiki-links to
+// - Backlinks: pages that link to this page
+func buildPageGraph(pageID string, linkTargets []string, backlinksMap map[string][]string, existingPages map[string]bool) *PageGraph {
 	pg := &PageGraph{Links: []GraphRef{}, Backlinks: []GraphRef{}}
 
-	// Resolve link targets
+	// Build Links
 	for _, target := range linkTargets {
-		// target is already the full path without extension (e.g. "recipes/mac")
-		// Use toHTMLName only for the display title (just the filename)
 		pg.Links = append(pg.Links, GraphRef{
 			Title: toHTMLName(target),
 			Href:  target + ".html",
-			Stub:  !generatedPages[target],
+			Stub:  !existingPages[target],
 		})
 	}
 
-	// Load global backlinks map
-	backlinksMap := loadBacklinks()
+	// Build Backlinks
 	for _, source := range backlinksMap[pageID] {
 		pg.Backlinks = append(pg.Backlinks, GraphRef{
 			Title: toHTMLName(source),
@@ -155,12 +153,15 @@ func buildPageGraph(pageID string, linkTargets []string, pageLinks map[string][]
 	return pg
 }
 
-// loadBacklinks reads the backlinks.json file into a map
+// loadBacklinks reads the backlinks map from backlinks.json
 func loadBacklinks() map[string][]string {
 	var m map[string][]string
 	data, err := os.ReadFile(filepath.Join(OutputDir, "backlinks.json"))
-	if err == nil {
-		json.Unmarshal(data, &m)
+	if err != nil {
+		return make(map[string][]string)
+	}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return make(map[string][]string)
 	}
 	return m
 }
