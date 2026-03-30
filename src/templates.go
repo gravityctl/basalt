@@ -97,7 +97,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     })();
     </script>
 </body>
-</html>`, title, css, title, navHTML, htmlContent, backlinksHTML, pageGraphJSON)
+</html>`, title, css, title, navHTML, htmlContent, backlinksHTML, string(pageGraphJSON))
 }
 
 // buildBacklinksHTML renders the Links and Backlinks sections for a page
