@@ -98,8 +98,7 @@ func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string, [
 // Returns e.g. "../index.html"
 func computeRelHref(sourcePageID, targetPageID string) string {
 	sourceDir := filepath.Dir(sourcePageID) // "recipes"
-	targetBase := toHTMLName(targetPageID)   // "index"
-	rel, err := filepath.Rel(sourceDir, targetBase)
+	rel, err := filepath.Rel(sourceDir, targetPageID)
 	if err != nil {
 		return targetPageID + ".html"
 	}

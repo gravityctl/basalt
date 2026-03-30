@@ -67,10 +67,10 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         var data = window.pageGraphData;
         if (data.links.length === 0 && data.backlinks.length === 0) { container.style.display = "none"; return; }
         var pageId = location.pathname.split("/").pop().replace(".html", "");
-        var nodes = [{ id: pageId, title: document.title.replace(" - Basalt", ""), current: true }];
+        var nodes = [{ id: pageId, title: document.title.replace(" - Basalt", ""), href: pageId + ".html", current: true }];
         var nodeIds = new Set([pageId]);
-        data.links.forEach(function(l) { var id = l.href.replace(".html", ""); if (!nodeIds.has(id)) { nodes.push({ id: id, title: l.title, stub: l.stub }); nodeIds.add(id); } });
-        data.backlinks.forEach(function(bl) { var id = bl.href.replace(".html", ""); if (!nodeIds.has(id)) { nodes.push({ id: id, title: bl.title }); nodeIds.add(id); } });
+        data.links.forEach(function(l) { var id = l.href.replace(".html", ""); if (!nodeIds.has(id)) { nodes.push({ id: id, title: l.title, href: l.href, stub: l.stub }); nodeIds.add(id); } });
+        data.backlinks.forEach(function(bl) { var id = bl.href.replace(".html", ""); if (!nodeIds.has(id)) { nodes.push({ id: id, title: bl.title, href: bl.href, stub: false }); nodeIds.add(id); } });
         var edges = [];
         data.links.forEach(function(l) { edges.push({ source: pageId, target: l.href.replace(".html", "") }); });
         data.backlinks.forEach(function(bl) { edges.push({ source: bl.href.replace(".html", ""), target: pageId }); });
@@ -91,7 +91,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
             .style("fill", function(d) { return d.stub ? "#e67e22" : (d.current ? "#2980b9" : "#3498db"); })
             .style("stroke", "white").style("stroke-width", 2);
         node.append("text").attr("dx", 10).attr("dy", 4).style("font-size", "11px").style("fill", "#333").text(function(d) { return d.title; });
-        node.on("click", function(event, d) { if (!d.stub && !d.current) window.location.href = d.id + ".html"; });
+        node.on("click", function(event, d) { if (!d.stub && !d.current) window.location.href = d.href; });
         node.on("mouseover", function(event, d) { link.style("stroke", function(l) { return (l.source.id === d.id || l.target.id === d.id) ? "#2980b9" : "#ccc"; }); });
         node.on("mouseout", function() { link.style("stroke", "#ccc"); });
         simulation.on("tick", function() {
