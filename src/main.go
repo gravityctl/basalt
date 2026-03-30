@@ -75,33 +75,32 @@ func run() error {
 			return nil
 		}
 
+		relPath, _ := filepath.Rel(SourceDir, path)
+
 		title, htmlBody, linkTargets, err := parser.ProcessFile(path, relPath)
 		if err != nil {
 			fmt.Printf("Error processing %s: %v\n", path, err)
 			return nil
 		}
 
-		relPath, _ := filepath.Rel(SourceDir, path)
 		pageID := filepath.Join(filepath.Dir(relPath), toHTMLName(relPath))
-
 		outputSubdir := filepath.Join(OutputDir, filepath.Dir(relPath))
-		if err := os.MkdirAll(outputSubdir, 0755); err != nil {
-			return err
+		if merr := os.MkdirAll(outputSubdir, 0755); merr != nil {
+			return merr
 		}
+
+		// Compute relative path from this page's output directory to the graph directory.
+		pageOutDir := filepath.Dir(filepath.Join(OutputDir, pageID))
+		graphScriptRelPath, _ := filepath.Rel(pageOutDir, filepath.Join(graphDir, "graph-local.js"))
 
 		// Build per-page graph data
 		pageGraph := buildPageGraph(pageID, linkTargets, backlinksMap, existingPages)
 
-		// Compute relative path from this page's output directory to the graph directory.
-		// Page is at OutputDir/pageID.html. Graph is at graphDir/index.html (graphDir = OutputDir/graph).
-		pageOutDir := filepath.Dir(filepath.Join(OutputDir, pageID))
-		graphScriptRelPath, _ := filepath.Rel(pageOutDir, filepath.Join(graphDir, "graph-local.js"))
-
 		// Write HTML page
 		outputFile := filepath.Join(OutputDir, pageID+".html")
 		html := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraph, graphScriptRelPath)
-		if err := os.WriteFile(outputFile, []byte(html), 0644); err != nil {
-			return err
+		if werr := os.WriteFile(outputFile, []byte(html), 0644); werr != nil {
+			return werr
 		}
 		fmt.Printf("Generated: %s\n", outputFile)
 
