@@ -80,7 +80,6 @@ func run() error {
 
 		// Per-page graph data
 		pageGraph := buildPageGraph(pageID, linkTargets, pageLinks, generatedPages)
-		pageGraphJSON, _ := json.Marshal(pageGraph)
 
 		// Write HTML page
 		outputFile := filepath.Join(outputSubdir, pageID+".html")
