@@ -44,10 +44,11 @@ type GraphRef struct {
 // wikiLinkRe matches [[Page]] and [[Page|Display Text]]
 var wikiLinkRe = regexp.MustCompile(`\[\[([^\]|]+)(?:\|([^\]]+))?\]\]`)
 
-// extractWikiLinks extracts all wiki-style links from content
-// Returns the cleaned content (with wiki links converted to markdown links)
-// and a list of all link targets found.
-func extractWikiLinks(content []byte) ([]byte, []string) {
+// extractWikiLinks extracts all wiki-style links from content.
+// sourceRelPath is the relative path of the source file within the vault (e.g. "recipes/index.md").
+// It returns the cleaned content (wiki links → markdown links) and the raw link targets.
+// Href paths are computed relative to the source file's directory in the output.
+func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string) {
 	links := []string{}
 
 	processed := wikiLinkRe.ReplaceAllFunc(content, func(match []byte) []byte {
@@ -60,24 +61,41 @@ func extractWikiLinks(content []byte) ([]byte, []string) {
 		if len(matches) >= 3 && len(matches[2]) > 0 {
 			display = string(matches[2])
 		}
+
 		links = append(links, target)
-		// Convert to standard markdown link
-		// Use full target path for href (toHTMLName strips dirs), but toHTMLName for display text
-		return []byte("[" + display + "](../" + target + ".html)")
+
+		// Compute href relative to source file's directory in output.
+		// sourcePageID e.g. "recipes/index" (no extension)
+		sourcePageID := strings.TrimSuffix(sourceRelPath, ".md")
+		sourceDir := filepath.Dir(sourcePageID) // "." for root files, "recipes" for files in subdirs
+		targetBase := toHTMLName(target)        // filename only, no dir
+		targetDir := filepath.Dir(target)       // directory part of wiki-link target
+
+		// Relative path from source's output directory to target's output file
+		rel, err := filepath.Rel(sourceDir, filepath.Join(targetDir, targetBase))
+		if err != nil {
+			rel = targetBase
+		}
+
+		// Build display text: use filename only (toHTMLName), or explicit display text if provided
+		linkDisplay := toHTMLName(target)
+		if len(matches) >= 3 && len(matches[2]) > 0 {
+			linkDisplay = display
+		}
+
+		return []byte("[" + linkDisplay + "](" + rel + ".html)")
 	})
 
 	return processed, links
 }
 
-// buildGraph walks the vault and builds the complete link graph
+// buildGraph walks the vault and builds the complete link graph.
+// Returns the graph, and a backlinks map (target pageID -> list of source pageIDs).
 func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 	g := &Graph{
 		Nodes: []GraphNode{},
 		Edges: []GraphEdge{},
 	}
-	// pageLinks: page path -> list of pages it links to
-	pageLinks := make(map[string][]string)
-	// allPages: set of all page IDs (for backlink computation)
 	allPages := make(map[string]bool)
 
 	// First pass: collect all existing pages
@@ -89,8 +107,7 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 			return nil
 		}
 		relPath, _ := filepath.Rel(vaultDir, path)
-		// Preserve directory structure: recipes/index.md -> recipes/index
-		pageID := filepath.Join(filepath.Dir(relPath), toHTMLName(relPath))
+		pageID := pageIDFromRelPath(relPath)
 		allPages[pageID] = true
 		return nil
 	})
@@ -108,24 +125,20 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 		}
 
 		relPath, _ := filepath.Rel(vaultDir, path)
-		sourceID := filepath.Join(filepath.Dir(relPath), toHTMLName(relPath))
+		sourceID := pageIDFromRelPath(relPath)
 
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil
 		}
 
-		_, links := extractWikiLinks(data)
-
-		pageLinks[sourceID] = links
+		_, targets := extractWikiLinks(data, relPath)
 
 		// Add edges
-		for _, target := range links {
-			// target already has full path without extension from extractWikiLinks
-			targetID := target
+		for _, target := range targets {
 			g.Edges = append(g.Edges, GraphEdge{
 				Source: sourceID,
-				Target: targetID,
+				Target: target,
 			})
 		}
 
@@ -140,7 +153,7 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 	for pageID := range allPages {
 		g.Nodes = append(g.Nodes, GraphNode{
 			ID:    pageID,
-			Title: pageID,
+			Title: toHTMLName(pageID),
 			Path:  pageID + ".html",
 			Stub:  false,
 		})
@@ -148,33 +161,41 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 	}
 
 	// Add stub nodes for dead links
-	for _, links := range pageLinks {
-		for _, target := range links {
-			// target is already full path without extension
-			if !addedNodes[target] {
-				g.Nodes = append(g.Nodes, GraphNode{
-					ID:    target,
-					Title: toHTMLName(target),
-					Path:  target + ".html",
-					Stub:  true,
-				})
-				addedNodes[target] = true
-			}
+	for _, edges := range g.Edges {
+		target := edges.Target
+		if !addedNodes[target] {
+			g.Nodes = append(g.Nodes, GraphNode{
+				ID:    target,
+				Title: toHTMLName(target),
+				Path:  target + ".html",
+				Stub:  true,
+			})
+			addedNodes[target] = true
 		}
 	}
 
 	// Compute backlinks: for each page, who links to it?
 	backlinks := make(map[string][]string)
-	for source, links := range pageLinks {
-		for _, target := range links {
-			// target is already full path without extension
-			backlinks[target] = append(backlinks[target], source)
-		}
+	for _, edge := range g.Edges {
+		backlinks[edge.Target] = append(backlinks[edge.Target], edge.Source)
 	}
 
-	// Store backlinks in a global JSON for per-page graph queries
-	backlinksJSON, _ := json.Marshal(backlinks)
+	// Store backlinks for per-page graph queries
+	backlinksJSON, _ := json.MarshalIndent(backlinks, "", "  ")
 	os.WriteFile(filepath.Join(vaultDir, "..", "output", "backlinks.json"), backlinksJSON, 0644)
 
-	return g, pageLinks, nil
+	return g, backlinks, nil
+}
+
+// pageIDFromRelPath converts a vault-relative path (e.g. "recipes/index.md")
+// to a page ID (e.g. "recipes/index") preserving directory structure.
+func pageIDFromRelPath(relPath string) string {
+	// relPath is like "recipes/index.md"
+	// pageID should be "recipes/index"
+	dir := filepath.Dir(relPath)        // "recipes"
+	base := toHTMLName(relPath)          // "index" (strips .md)
+	if dir == "." {
+		return base
+	}
+	return filepath.Join(dir, base)
 }

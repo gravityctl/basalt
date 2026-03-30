@@ -39,7 +39,7 @@ func run() error {
 	fmt.Println("Building Basalt Site...")
 
 	// Build full vault graph (computes all pages, edges, writes backlinks.json)
-	graph, pageLinks, err := buildGraph(SourceDir)
+	graph, _, err := buildGraph(SourceDir)
 	if err != nil {
 		return fmt.Errorf("building graph: %w", err)
 	}
@@ -75,7 +75,7 @@ func run() error {
 			return nil
 		}
 
-		title, htmlBody, linkTargets, err := parser.ProcessFile(path)
+		title, htmlBody, linkTargets, err := parser.ProcessFile(path, relPath)
 		if err != nil {
 			fmt.Printf("Error processing %s: %v\n", path, err)
 			return nil
@@ -92,9 +92,14 @@ func run() error {
 		// Build per-page graph data
 		pageGraph := buildPageGraph(pageID, linkTargets, backlinksMap, existingPages)
 
+		// Compute relative path from this page's output directory to the graph directory.
+		// Page is at OutputDir/pageID.html. Graph is at graphDir/index.html (graphDir = OutputDir/graph).
+		pageOutDir := filepath.Dir(filepath.Join(OutputDir, pageID))
+		graphScriptRelPath, _ := filepath.Rel(pageOutDir, filepath.Join(graphDir, "graph-local.js"))
+
 		// Write HTML page
 		outputFile := filepath.Join(OutputDir, pageID+".html")
-		html := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraph)
+		html := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraph, graphScriptRelPath)
 		if err := os.WriteFile(outputFile, []byte(html), 0644); err != nil {
 			return err
 		}

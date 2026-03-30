@@ -31,14 +31,15 @@ func NewMarkdownParser() *MarkdownParser {
 
 // ProcessFile reads a markdown file, extracts metadata and wiki-links,
 // then returns the title, rendered HTML body, and extracted link targets.
-func (p *MarkdownParser) ProcessFile(filePath string) (title string, htmlBody []byte, linkTargets []string, err error) {
+// sourceRelPath is the vault-relative path of this file (e.g. "recipes/index.md").
+func (p *MarkdownParser) ProcessFile(filePath, sourceRelPath string) (title string, htmlBody []byte, linkTargets []string, err error) {
 	rawContent, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", nil, nil, err
 	}
 
 	title = extractTitle(rawContent)
-	contentWithLinks, targets := extractWikiLinks(rawContent)
+	contentWithLinks, targets := extractWikiLinks(rawContent, sourceRelPath)
 	linkTargets = targets
 
 	// Strip frontmatter for rendering

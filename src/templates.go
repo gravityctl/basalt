@@ -8,8 +8,9 @@ import (
 )
 
 // generateHTMLTemplate produces the full HTML page for a rendered markdown file.
-// It includes the per-page graph data as embedded JSON and injects the local graph script.
-func generateHTMLTemplate(title string, htmlContent string, sourcePath string, pageGraph *PageGraph) string {
+// graphScriptRelPath is the relative path from this page's output directory to the graph directory
+// (e.g. "../graph/graph-local.js" for pages in subdirectories, "graph/graph-local.js" for root pages).
+func generateHTMLTemplate(title string, htmlContent string, sourcePath string, pageGraph *PageGraph, graphScriptRelPath string) string {
 	css := `
 	:root { --bg: #f8f8f8; --text: #333; --link: #2980b9; }
 	body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 850px; margin: 0 auto; padding: 20px; background: var(--bg); color: var(--text); }
@@ -62,9 +63,9 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     <script>
     window.pageGraphData = %s;
     </script>
-    <script src="graph-local.js"></script>
+    <script src="%s"></script>
 </body>
-</html>`, title, css, title, navHTML, htmlContent, backlinksHTML, pageGraphJSON)
+</html>`, title, css, title, navHTML, htmlContent, backlinksHTML, pageGraphJSON, graphScriptRelPath)
 }
 
 // buildBacklinksHTML renders the Links and Backlinks sections for a page
