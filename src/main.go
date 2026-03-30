@@ -70,7 +70,8 @@ func run() error {
 		}
 
 		relPath, _ := filepath.Rel(SourceDir, path)
-		pageID := toHTMLName(relPath)
+		// Preserve subdirectory: recipes/index.md -> recipes/index
+		pageID := filepath.Join(filepath.Dir(relPath), toHTMLName(relPath))
 
 		// Ensure output directory exists for this page
 		outputSubdir := filepath.Join(OutputDir, filepath.Dir(relPath))
@@ -82,7 +83,7 @@ func run() error {
 		pageGraph := buildPageGraph(pageID, linkTargets, pageLinks, generatedPages)
 
 		// Write HTML page
-		outputFile := filepath.Join(outputSubdir, pageID+".html")
+		outputFile := filepath.Join(OutputDir, pageID+".html")
 		html := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraph)
 		if err := os.WriteFile(outputFile, []byte(html), 0644); err != nil {
 			return err
@@ -133,11 +134,12 @@ func buildPageGraph(pageID string, linkTargets []string, pageLinks map[string][]
 
 	// Resolve link targets
 	for _, target := range linkTargets {
-		targetID := toHTMLName(target)
+		// target is already the full path without extension (e.g. "recipes/mac")
+		// Use toHTMLName only for the display title (just the filename)
 		pg.Links = append(pg.Links, GraphRef{
-			Title: target,
-			Href:  targetID + ".html",
-			Stub:  !generatedPages[targetID],
+			Title: toHTMLName(target),
+			Href:  target + ".html",
+			Stub:  !generatedPages[target],
 		})
 	}
 
@@ -145,7 +147,7 @@ func buildPageGraph(pageID string, linkTargets []string, pageLinks map[string][]
 	backlinksMap := loadBacklinks()
 	for _, source := range backlinksMap[pageID] {
 		pg.Backlinks = append(pg.Backlinks, GraphRef{
-			Title: source,
+			Title: toHTMLName(source),
 			Href:  source + ".html",
 		})
 	}

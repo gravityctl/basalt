@@ -62,7 +62,8 @@ func extractWikiLinks(content []byte) ([]byte, []string) {
 		}
 		links = append(links, target)
 		// Convert to standard markdown link
-		return []byte("[" + display + "](../" + toHTMLName(target) + ")")
+		// Use full target path for href (toHTMLName strips dirs), but toHTMLName for display text
+		return []byte("[" + display + "](../" + target + ".html)")
 	})
 
 	return processed, links
@@ -88,7 +89,8 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 			return nil
 		}
 		relPath, _ := filepath.Rel(vaultDir, path)
-		pageID := toHTMLName(strings.TrimSuffix(relPath, ".html"))
+		// Preserve directory structure: recipes/index.md -> recipes/index
+		pageID := filepath.Join(filepath.Dir(relPath), toHTMLName(relPath))
 		allPages[pageID] = true
 		return nil
 	})
@@ -106,7 +108,7 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 		}
 
 		relPath, _ := filepath.Rel(vaultDir, path)
-		sourceID := toHTMLName(strings.TrimSuffix(relPath, ".html"))
+		sourceID := filepath.Join(filepath.Dir(relPath), toHTMLName(relPath))
 
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -119,7 +121,8 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 
 		// Add edges
 		for _, target := range links {
-			targetID := toHTMLName(target)
+			// target already has full path without extension from extractWikiLinks
+			targetID := target
 			g.Edges = append(g.Edges, GraphEdge{
 				Source: sourceID,
 				Target: targetID,
@@ -147,15 +150,15 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 	// Add stub nodes for dead links
 	for _, links := range pageLinks {
 		for _, target := range links {
-			targetID := toHTMLName(target)
-			if !addedNodes[targetID] {
+			// target is already full path without extension
+			if !addedNodes[target] {
 				g.Nodes = append(g.Nodes, GraphNode{
-					ID:    targetID,
-					Title: targetID,
-					Path:  targetID + ".html",
+					ID:    target,
+					Title: toHTMLName(target),
+					Path:  target + ".html",
 					Stub:  true,
 				})
-				addedNodes[targetID] = true
+				addedNodes[target] = true
 			}
 		}
 	}
@@ -164,8 +167,8 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 	backlinks := make(map[string][]string)
 	for source, links := range pageLinks {
 		for _, target := range links {
-			targetID := toHTMLName(target)
-			backlinks[targetID] = append(backlinks[targetID], source)
+			// target is already full path without extension
+			backlinks[target] = append(backlinks[target], source)
 		}
 	}
 
@@ -199,19 +202,18 @@ func generatePageGraph(pageID string, pageLinks map[string][]string, vaultDir st
 		}
 		if strings.HasSuffix(path, ".md") {
 			relPath, _ := filepath.Rel(vaultDir, path)
-			pageID := toHTMLName(strings.TrimSuffix(relPath, ".html"))
+			pageID := filepath.Join(filepath.Dir(relPath), toHTMLName(relPath))
 			existingPages[pageID] = true
 		}
 		return nil
 	})
 
-	// Build Links
+	// Build Links — target is already full path without extension
 	for _, target := range links {
-		targetID := toHTMLName(target)
-		stub := !existingPages[targetID]
+		stub := !existingPages[target]
 		pg.Links = append(pg.Links, GraphRef{
-			Title: target,
-			Href:  targetID + ".html",
+			Title: toHTMLName(target),
+			Href:  target + ".html",
 			Stub:  stub,
 		})
 	}
@@ -219,7 +221,7 @@ func generatePageGraph(pageID string, pageLinks map[string][]string, vaultDir st
 	// Build Backlinks
 	for _, source := range backlinksMap[pageID] {
 		pg.Backlinks = append(pg.Backlinks, GraphRef{
-			Title: source,
+			Title: toHTMLName(source),
 			Href:  source + ".html",
 			Stub:  false,
 		})
