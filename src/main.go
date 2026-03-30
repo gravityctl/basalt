@@ -39,7 +39,7 @@ func run() error {
 	fmt.Println("Building Basalt Site...")
 
 	// Build full vault graph (computes all pages, edges, writes backlinks.json)
-	graph, _, err := buildGraph(SourceDir)
+	graph, _, pageTitles, err := buildGraph(SourceDir)
 	if err != nil {
 		return fmt.Errorf("building graph: %w", err)
 	}
@@ -90,7 +90,7 @@ func run() error {
 		}
 
 		// Build per-page graph data
-		pageGraph := buildPageGraph(pageID, linkTargets, linkHrefs, backlinksMap, existingPages)
+		pageGraph := buildPageGraph(pageID, linkTargets, linkHrefs, backlinksMap, existingPages, pageTitles)
 
 		// Write HTML page
 		outputFile := filepath.Join(OutputDir, pageID+".html")
@@ -130,7 +130,7 @@ func run() error {
 // buildPageGraph builds the per-page graph data for a given page:
 // - Links: pages this page wiki-links to
 // - Backlinks: pages that link to this page
-func buildPageGraph(pageID string, linkTargets []string, linkHrefs []string, backlinksMap map[string][]string, existingPages map[string]bool) *PageGraph {
+func buildPageGraph(pageID string, linkTargets []string, linkHrefs []string, backlinksMap map[string][]string, existingPages map[string]bool, pageTitles map[string]string) *PageGraph {
 	pg := &PageGraph{Links: []GraphRef{}, Backlinks: []GraphRef{}}
 
 	// Build Links — use linkHrefs (computed relative hrefs) not bare target paths
@@ -146,11 +146,16 @@ func buildPageGraph(pageID string, linkTargets []string, linkHrefs []string, bac
 		})
 	}
 
-	// Build Backlinks
+	// Build Backlinks — compute relative hrefs from this page's directory
 	for _, source := range backlinksMap[pageID] {
+		title := toHTMLName(source)
+		if t, ok := pageTitles[source]; ok && t != "" {
+			title = t
+		}
 		pg.Backlinks = append(pg.Backlinks, GraphRef{
-			Title: toHTMLName(source),
-			Href:  source + ".html",
+			Title: title,
+			Href:  computeRelHref(pageID, source),
+			Stub:  !existingPages[source],
 		})
 	}
 

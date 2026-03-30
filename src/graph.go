@@ -49,7 +49,7 @@ var wikiLinkRe = regexp.MustCompile(`\[\[([^\]|]+)(?:\|([^\]]+))?\]\]`)
 // extractWikiLinks extracts all wiki-style links from content.
 // sourceRelPath is the relative path of the source file within the vault (e.g. "recipes/index.md").
 // Returns the cleaned content (wiki links → markdown links), raw link targets, and the computed
-// relative hrefs for each link (matching the href used in the markdown output).
+// relative hrefs for each link.
 func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string, []string) {
 	targets := []string{}
 	rels := []string{}
@@ -72,7 +72,7 @@ func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string, [
 		sourcePageID := strings.TrimSuffix(sourceRelPath, ".md")
 		sourceDir := filepath.Dir(sourcePageID) // "." for root files, "recipes" for files in subdirs
 		targetBase := toHTMLName(target)        // filename only, no dir
-		targetDir := filepath.Dir(target)       // directory part of wiki-link target
+		targetDir := filepath.Dir(target)        // directory part of wiki-link target
 
 		// Relative path from source's output directory to target's output file
 		rel, err := filepath.Rel(sourceDir, filepath.Join(targetDir, targetBase))
@@ -93,16 +93,30 @@ func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string, [
 	return processed, targets, rels
 }
 
+// computeRelHref computes the relative href from a source page to a target page.
+// sourcePageID e.g. "recipes/tacos", targetPageID e.g. "recipes/index"
+// Returns e.g. "../index.html"
+func computeRelHref(sourcePageID, targetPageID string) string {
+	sourceDir := filepath.Dir(sourcePageID) // "recipes"
+	targetBase := toHTMLName(targetPageID)   // "index"
+	rel, err := filepath.Rel(sourceDir, targetBase)
+	if err != nil {
+		return targetPageID + ".html"
+	}
+	return rel + ".html"
+}
+
 // buildGraph walks the vault and builds the complete link graph.
 // Returns the graph, and a backlinks map (target pageID -> list of source pageIDs).
-func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
+func buildGraph(vaultDir string) (*Graph, map[string][]string, map[string]string, error) {
 	g := &Graph{
 		Nodes: []GraphNode{},
 		Edges: []GraphEdge{},
 	}
 	allPages := make(map[string]bool)
+	pageTitles := make(map[string]string) // pageID -> title (from frontmatter or default)
 
-	// First pass: collect all existing pages
+	// First pass: collect all existing pages and their titles
 	err := filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -113,10 +127,16 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 		relPath, _ := filepath.Rel(vaultDir, path)
 		pageID := pageIDFromRelPath(relPath)
 		allPages[pageID] = true
+
+		// Extract title from frontmatter
+		data, err := os.ReadFile(path)
+		if err == nil {
+			pageTitles[pageID] = extractTitle(data)
+		}
 		return nil
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Second pass: extract links from each page
@@ -138,7 +158,6 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 
 		_, targets, _ := extractWikiLinks(data, relPath)
 
-		// Add edges
 		for _, target := range targets {
 			g.Edges = append(g.Edges, GraphEdge{
 				Source: sourceID,
@@ -149,15 +168,19 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Build nodes from all pages + stub pages (dead link targets)
 	addedNodes := make(map[string]bool)
 	for pageID := range allPages {
+		title := pageTitles[pageID]
+		if title == "" {
+			title = toHTMLName(pageID)
+		}
 		g.Nodes = append(g.Nodes, GraphNode{
 			ID:    pageID,
-			Title: toHTMLName(pageID),
+			Title: title,
 			Path:  pageID + ".html",
 			Stub:  false,
 		})
@@ -188,7 +211,7 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 	backlinksJSON, _ := json.Marshal(backlinks)
 	os.WriteFile(filepath.Join(vaultDir, "..", "output", "backlinks.json"), backlinksJSON, 0644)
 
-	return g, backlinks, nil
+	return g, backlinks, pageTitles, nil
 }
 
 // pageIDFromRelPath converts a vault-relative path (e.g. "recipes/index.md")
