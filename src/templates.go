@@ -8,9 +8,7 @@ import (
 )
 
 // generateHTMLTemplate produces the full HTML page for a rendered markdown file.
-// graphScriptRelPath is the relative path from this page's output directory to the graph directory
-// (e.g. "../graph/graph-local.js" for pages in subdirectories, "graph/graph-local.js" for root pages).
-func generateHTMLTemplate(title string, htmlContent string, sourcePath string, pageGraph *PageGraph, graphScriptRelPath string) string {
+func generateHTMLTemplate(title string, htmlContent string, sourcePath string, pageGraph *PageGraph) string {
 	css := `
 	:root { --bg: #f8f8f8; --text: #333; --link: #2980b9; }
 	body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 850px; margin: 0 auto; padding: 20px; background: var(--bg); color: var(--text); }
@@ -58,14 +56,48 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
             %s
         </div>
         %s
-        <div id="local-graph"></div>
-    </main>
     <script>
-    window.pageGraphData = %s;
+    (function() {
+        var container = document.getElementById("local-graph");
+        if (!container || !window.pageGraphData) return;
+        var data = window.pageGraphData;
+        if (data.links.length === 0 && data.backlinks.length === 0) { container.style.display = "none"; return; }
+        var pageId = location.pathname.split("/").pop().replace(".html", "");
+        var nodes = [{ id: pageId, title: document.title.replace(" - Basalt", ""), current: true }];
+        var nodeIds = new Set([pageId]);
+        data.links.forEach(function(l) { var id = l.href.replace(".html", ""); if (!nodeIds.has(id)) { nodes.push({ id: id, title: l.title, stub: l.stub }); nodeIds.add(id); } });
+        data.backlinks.forEach(function(bl) { var id = bl.href.replace(".html", ""); if (!nodeIds.has(id)) { nodes.push({ id: id, title: bl.title }); nodeIds.add(id); } });
+        var edges = [];
+        data.links.forEach(function(l) { edges.push({ source: pageId, target: l.href.replace(".html", "") }); });
+        data.backlinks.forEach(function(bl) { edges.push({ source: bl.href.replace(".html", ""), target: pageId }); });
+        var width = container.clientWidth, height = 300;
+        var svg = d3.select(container).append("svg").attr("width", width).attr("height", height);
+        var simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(edges).id(function(d) { return d.id; }).distance(60))
+            .force("charge", d3.forceManyBody().strength(-150))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collision", d3.forceCollide().radius(25));
+        var link = svg.append("g").selectAll("line").data(edges).enter().append("line").style("stroke", "#ccc").style("stroke-width", 1.5);
+        var node = svg.append("g").selectAll("g").data(nodes).enter().append("g").attr("class", "node")
+            .call(d3.drag()
+                .on("start", function(s) { if (!s.active) simulation.alphaTarget(0.3).restart(); s.subject.fx = s.subject.x; s.subject.fy = s.subject.y; })
+                .on("drag", function(s) { s.subject.fx = s.x; s.subject.fy = s.y; })
+                .on("end", function(s) { if (!s.active) simulation.alphaTarget(0); s.subject.fx = null; s.subject.fy = null; }));
+        node.append("circle").attr("r", function(d) { return d.current ? 10 : 6; })
+            .style("fill", function(d) { return d.stub ? "#e67e22" : (d.current ? "#2980b9" : "#3498db"); })
+            .style("stroke", "white").style("stroke-width", 2);
+        node.append("text").attr("dx", 10).attr("dy", 4).style("font-size", "11px").style("fill", "#333").text(function(d) { return d.title; });
+        node.on("click", function(event, d) { if (!d.stub && !d.current) window.location.href = d.id + ".html"; });
+        node.on("mouseover", function(event, d) { link.style("stroke", function(l) { return (l.source.id === d.id || l.target.id === d.id) ? "#2980b9" : "#ccc"; }); });
+        node.on("mouseout", function() { link.style("stroke", "#ccc"); });
+        simulation.on("tick", function() {
+            link.attr("x1", function(d) { return d.source.x; }).attr("y1", function(d) { return d.source.y; }).attr("x2", function(d) { return d.target.x; }).attr("y2", function(d) { return d.target.y; });
+            node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+        });
+    })();
     </script>
-    <script src="%s"></script>
 </body>
-</html>`, title, css, title, navHTML, htmlContent, backlinksHTML, pageGraphJSON, graphScriptRelPath)
+</html>`, title, css, title, navHTML, htmlContent, backlinksHTML, pageGraphJSON)
 }
 
 // buildBacklinksHTML renders the Links and Backlinks sections for a page

@@ -89,16 +89,12 @@ func run() error {
 			return merr
 		}
 
-		// Compute relative path from this page's output directory to the graph directory.
-		pageOutDir := filepath.Dir(filepath.Join(OutputDir, pageID))
-		graphScriptRelPath, _ := filepath.Rel(pageOutDir, filepath.Join(graphDir, "graph-local.js"))
-
 		// Build per-page graph data
 		pageGraph := buildPageGraph(pageID, linkTargets, backlinksMap, existingPages)
 
 		// Write HTML page
 		outputFile := filepath.Join(OutputDir, pageID+".html")
-		html := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraph, graphScriptRelPath)
+		html := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraph)
 		if werr := os.WriteFile(outputFile, []byte(html), 0644); werr != nil {
 			return werr
 		}
