@@ -169,12 +169,12 @@ window.navTree = %s;
         // Render nodes/links immediately (before sim ticks)
         var link = linkG.selectAll('line').data(edges).enter().append('line').style('stroke', '#ccc').style('stroke-width', 1.5);
         var node = nodeG.selectAll('g').data(nodes).enter().append('g')
-            .style('cursor', function(d) { return d.stub || d.current ? 'default' : 'pointer'; })
-            .call(_d3.drag()
-                .on('start', function(e) { if (!e.active) sim.alphaTarget(0.3).restart(); e.subject.fx = e.subject.x; e.subject.fy = e.subject.y; })
-                .on('drag', function(e) { e.subject.fx = e.x; e.subject.fy = e.y; })
-                .on('end', function(e) { if (!e.active) sim.alphaTarget(0); e.subject.fx = null; e.subject.fy = null; }))
-            .on('click', function(e, d) { if (!d.stub && !d.current) window.location.href = d.href; });
+            .style('cursor', function(d) { return d.stub || d.current ? 'default' : 'pointer'; });
+        node.call(_d3.drag()
+            .on('start', function(e) { if (!e.active) sim.alphaTarget(0.3).restart(); e.subject.fx = e.subject.x; e.subject.fy = e.subject.y; })
+            .on('drag', function(e) { e.subject.fx = e.x; e.subject.fy = e.y; })
+            .on('end', function(e) { if (!e.active) sim.alphaTarget(0); e.subject.fx = null; e.subject.fy = null; }));
+        node.on('click', function(e, d) { if (!d.stub && !d.current) window.location.href = d.href; });
         node.append('circle').attr('r', function(d) { return d.current ? 7 : 4 }).style('fill', function(d) { return d.stub ? '#e67e22' : (d.current ? '#2980b9' : '#3498db'); }).style('stroke', 'white').style('stroke-width', 1.5);
         node.append('text').attr('dx', 7).attr('dy', 3).style('font-size', '9px').style('fill', '#333').text(function(d) { return d.title; });
         // Update positions on every tick
