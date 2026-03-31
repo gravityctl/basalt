@@ -140,10 +140,14 @@ window.navTree = %s;
     var _dp = _cur.split('/').length - 1;
     var _d3p = _dp > 0 ? '../'.repeat(_dp) + 'graph/d3.min.js' : 'graph/d3.min.js';
     function drawGraph() {
+        try {
+        console.log('graph: drawGraph called');
         var container = document.getElementById('local-graph');
         if (!container) { console.log('graph: no container'); return; }
         if (typeof window.d3 === 'undefined') { console.log('graph: d3 not loaded'); return; }
         var _d3 = window.d3;
+        console.log('graph: d3 version=' + (_d3.version || 'unknown'));
+        console.log('graph: d3 forceSimulation=' + typeof _d3.forceSimulation);
         var data = window.pageGraphData;
         var pageId = location.pathname.split('/').filter(Boolean).pop().replace('.html', '');
         var nodes = [{ id: pageId, title: document.title.replace(' - Basalt', ''), href: location.pathname.split('/').filter(Boolean).pop(), current: true }];
@@ -158,8 +162,11 @@ window.navTree = %s;
         var h = 180;
         var svg = _d3.select(container).append('svg').attr('width', w).attr('height', h);
         // Create SVG groups BEFORE simulation starts so tick can update them
+        console.log('graph: svg created, w=' + w + ', h=' + h);
+        console.log('graph: nodes count=' + nodes.length + ', edges count=' + edges.length);
         var linkG = svg.append('g');
         var nodeG = svg.append('g');
+        console.log('graph: groups created, linkG type=' + typeof linkG + ', nodeG type=' + typeof nodeG);
         var sim = _d3.forceSimulation(nodes)
             .force('link', _d3.forceLink(edges).id(function(d) { return d.id; }).distance(40))
             .force('charge', _d3.forceManyBody().strength(-80))
@@ -176,16 +183,24 @@ window.navTree = %s;
         node.on('click', function(e, d) { if (!d.stub && !d.current) window.location.href = d.href; });
         node.append('circle').attr('r', function(d) { return d.current ? 7 : 4 }).style('fill', function(d) { return d.stub ? '#e67e22' : (d.current ? '#2980b9' : '#3498db'); }).style('stroke', 'white').style('stroke-width', 1.5);
         node.append('text').attr('dx', 7).attr('dy', 3).style('font-size', '9px').style('fill', '#333').text(function(d) { return d.title; });
+        console.log('graph: sim created, node count=' + nodes.length);
+        console.log('graph: link selection=' + (typeof link) + ', node selection=' + (typeof node));
+        console.log('graph: calling tick...');
         // Update positions on every tick
         sim.on('tick', function() {
+            try {
             link.attr('x1', function(d) { return d.source.x; }).attr('y1', function(d) { return d.source.y; })
               .attr('x2', function(d) { return d.target.x; }).attr('y2', function(d) { return d.target.y; });
             node.attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+            } catch(e) { console.log('graph: tick error=' + e); }
         });
+        console.log('graph: tick registered, simulation should be running');
+        } catch(e) { console.log('graph: drawGraph error: ' + e); }
     }
     var s = document.createElement("script");
     s.src = _d3p;
-    s.onload = drawGraph;
+    s.onload = function() { console.log('graph: script loaded'); drawGraph(); };
+    s.onerror = function() { console.log('graph: script failed to load: ' + _d3p); };
     document.head.appendChild(s);
 })();
 </script>
