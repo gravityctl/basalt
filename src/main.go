@@ -1,567 +1,185 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
-
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/extension"
-	"github.com/yuin/goldmark/parser"
 )
 
-// Configuration
+// Config — adjust these to match your vault layout
 const (
-	SourceDir = "../vault"   // Your Obsidian folder
-	OutputDir = "../output"  // Where the static site goes
+	SourceDir = "../vault"
+	OutputDir = "../output"
 )
-
-// MarkdownParser handles the conversion logic
-type MarkdownParser struct {
-	markdown goldmark.Markdown
-}
-
-// NewMarkdownParser initializes the goldmark engine
-func NewMarkdownParser() *MarkdownParser {
-	return &MarkdownParser{
-		markdown: goldmark.New(
-			goldmark.WithExtensions(extension.GFM, extension.TaskList, extension.Typographer),
-			goldmark.WithParserOptions(
-				parser.WithAutoHeadingID(),
-			),
-		),
-	}
-}
-
-// ProcessFile reads a markdown file, extracts metadata, and returns HTML
-func (p *MarkdownParser) ProcessFile(filePath string) (string, []byte, error) {
-	rawContent, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", nil, err
-	}
-
-	title := extractTitle(rawContent)
-	contentToRender, _ := extractWikiLinks(rawContent)
-
-	// Convert Markdown to HTML
-	var buf bytes.Buffer
-	if err := p.markdown.Convert(contentToRender, &buf); err != nil {
-		return "", nil, err
-	}
-
-	htmlContent := buf.String()
-
-	// CRITICAL: Rewrite internal links from .md to .html
-	// This regex finds links like [text](filename.md) and replaces .md with .html
-	reLink := regexp.MustCompile(`\(([^)]*?\.md)\)`)
-	htmlContent = reLink.ReplaceAllString(htmlContent, "($1html)")
-
-	return title, []byte(htmlContent), nil
-}
-
-// Helper: Extract title from Frontmatter or file
-func extractTitle(data []byte) string {
-	// 1. Check for YAML Frontmatter
-	re := regexp.MustCompile(`(?s)^---\s*\n.*?\n---\n?`)
-	matches := re.FindSubmatch(data)
-	if matches != nil {
-		yamlContent := string(matches[0])
-		lines := strings.Split(yamlContent, "\n")
-		for _, line := range lines {
-			if strings.HasPrefix(line, "title:") {
-				parts := strings.SplitN(line, ":", 2)
-				if len(parts) == 2 {
-					return strings.TrimSpace(parts[1])
-				}
-			}
-		}
-	}
-
-	// 2. Fallback: First H1 in document
-	h1Re := regexp.MustCompile(`(?m)^#\s+(.*)$`)
-	if matches := h1Re.FindSubmatch(data); len(matches) == 2 {
-		return strings.TrimSpace(string(matches[1]))
-	}
-
-	// 3. Fallback: Filename
-	return "Untitled"
-}
-
-// Helper: Clean filename for HTML
-func toHTMLName(mdPath string) string {
-	base := strings.TrimSuffix(filepath.Base(mdPath), ".md")
-	return base
-}
 
 func main() {
-	parser := NewMarkdownParser()
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
 
-	// Check if source exists
+func run() error {
 	if _, err := os.Stat(SourceDir); os.IsNotExist(err) {
-		fmt.Printf("Error: Source directory '%s' not found.\n", SourceDir)
-		fmt.Println("Please create this folder and add your Obsidian .md files.")
-		return
+		return fmt.Errorf("source directory %q not found", SourceDir)
 	}
 
-	// Create output directory
-	err := os.MkdirAll(OutputDir, 0755)
-	if err != nil {
-		fmt.Printf("Error creating output directory: %v\n", err)
-		return
+	if err := os.MkdirAll(OutputDir, 0755); err != nil {
+		return fmt.Errorf("creating output dir: %w", err)
 	}
 
-	// Create graph output directory
 	graphDir := filepath.Join(OutputDir, "graph")
-	os.MkdirAll(graphDir, 0755)
+	if err := os.MkdirAll(graphDir, 0755); err != nil {
+		return fmt.Errorf("creating graph dir: %w", err)
+	}
 
 	fmt.Println("Building Basalt Site...")
 
-	// Build the full graph first (two-pass: collect all pages, then extract links)
-	graph, pageLinks, err := buildGraph(SourceDir)
+	// Build full vault graph (computes all pages, edges, writes backlinks.json)
+	graph, _, pageTitles, err := buildGraph(SourceDir)
 	if err != nil {
-		fmt.Printf("Error building graph: %v\n", err)
-		return
+		return fmt.Errorf("building graph: %w", err)
 	}
 
-	// Write global graph.json
 	graphJSON, err := json.MarshalIndent(graph, "", "  ")
 	if err != nil {
-		fmt.Printf("Error marshaling graph: %v\n", err)
-		return
+		return fmt.Errorf("marshaling graph: %w", err)
 	}
-	os.WriteFile(filepath.Join(OutputDir, "graph.json"), graphJSON, 0644)
+	if err := os.WriteFile(filepath.Join(OutputDir, "graph.json"), graphJSON, 0644); err != nil {
+		return fmt.Errorf("writing graph.json: %w", err)
+	}
 	fmt.Printf("Graph: %d nodes, %d edges\n", len(graph.Nodes), len(graph.Edges))
 
-	// Track stub pages (dead links) to generate later
-	stubTargets := make(map[string]bool)
+	// Load the set of all existing pages for stub detection
+	existingPages := make(map[string]bool)
 	for _, node := range graph.Nodes {
-		if node.Stub {
-			stubTargets[node.ID] = true
+		if !node.Stub {
+			existingPages[node.ID] = true
 		}
 	}
 
-	// Walk through the vault and generate pages
+	// Load backlinks map for per-page backlink lookup
+	backlinksMap := loadBacklinks()
+
+	// Build navigation tree for left sidebar
+	navTree := buildNavTree(SourceDir)
+	navTreeJSON, _ := json.Marshal(navTree)
+
+	parser := NewMarkdownParser()
+
+	// Walk the vault and generate HTML for each markdown file
 	err = filepath.Walk(SourceDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-
-		// Only process .md files
 		if !strings.HasSuffix(path, ".md") {
 			return nil
 		}
 
-		// Process content
-		title, htmlBody, err := parser.ProcessFile(path)
+		relPath, _ := filepath.Rel(SourceDir, path)
+
+		// Read raw content to extract tags before processing
+		rawContent, _ := os.ReadFile(path)
+		tags := extractTags(rawContent)
+
+		title, htmlBody, linkTargets, linkHrefs, err := parser.ProcessFile(path, relPath)
 		if err != nil {
 			fmt.Printf("Error processing %s: %v\n", path, err)
 			return nil
 		}
 
-		// Generate Output Filename
-		relPath, _ := filepath.Rel(SourceDir, path)
-		outputDir := filepath.Join(OutputDir, filepath.Dir(relPath))
-		os.MkdirAll(outputDir, 0755)
-
-		outputFile := filepath.Join(outputDir, toHTMLName(relPath)+".html")
-
-		// Get per-page graph data
-		pageID := toHTMLName(relPath)
-		pageGraph := generatePageGraph(pageID, pageLinks, SourceDir)
-		pageGraphJSON, _ := json.Marshal(pageGraph)
-
-		// Generate the HTML Template
-		finalHTML := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraphJSON)
-
-		// Write to disk
-		err = os.WriteFile(outputFile, []byte(finalHTML), 0644)
-		if err != nil {
-			return err
+		pageID := filepath.Join(filepath.Dir(relPath), toHTMLName(relPath))
+		outputSubdir := filepath.Join(OutputDir, filepath.Dir(relPath))
+		if merr := os.MkdirAll(outputSubdir, 0755); merr != nil {
+			return merr
 		}
 
-		fmt.Printf("Generated: %s\n", outputFile)
+		// Build per-page graph data
+		pageGraph := buildPageGraph(pageID, linkTargets, linkHrefs, backlinksMap, existingPages, pageTitles, tags)
+		pageGraph.CurrentHref = pageID + ".html"
 
-		// Remove from stub targets (it exists now)
-		delete(stubTargets, pageID)
+		// Write HTML page
+		outputFile := filepath.Join(OutputDir, pageID+".html")
+		html := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraph, string(navTreeJSON))
+		if werr := os.WriteFile(outputFile, []byte(html), 0644); werr != nil {
+			return werr
+		}
+		fmt.Printf("Generated: %s\n", outputFile)
 
 		return nil
 	})
-
 	if err != nil {
-		fmt.Printf("Walk error: %v\n", err)
+		return fmt.Errorf("walking vault: %w", err)
 	}
 
-	// Generate stub pages for dead links
-	for stubID := range stubTargets {
-		stubHTML := generateStubHTML(stubID)
-		stubFile := filepath.Join(OutputDir, stubID+".html")
-		os.WriteFile(stubFile, []byte(stubHTML), 0644)
-		fmt.Printf("Stubbed: %s (dead link target)\n", stubFile)
+	// Generate stub pages for dead link targets
+	stubCount := 0
+	for _, node := range graph.Nodes {
+		if node.Stub {
+			stubFile := filepath.Join(OutputDir, node.ID+".html")
+			if err := os.WriteFile(stubFile, []byte(generateStubHTML(node.ID)), 0644); err != nil {
+				return err
+			}
+			fmt.Printf("Stubbed: %s\n", stubFile)
+			stubCount++
+		}
+	}
+	if stubCount > 0 {
+		fmt.Printf("Generated %d stub pages\n", stubCount)
 	}
 
-	// Write the graph viewer
-	writeGraphViewer(graphDir, len(graph.Nodes))
-
+	writeGraphViewer(graphDir, graphJSON)
 	fmt.Println("Build complete.")
+	return nil
 }
 
-// generateStubHTML creates a stub page for a dead link
-func generateStubHTML(pageID string) string {
-	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s — Create Page</title>
-    <style>
-        :root { --bg: #f8f8f8; --text: #333; --link: #2980b9; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 850px; margin: 0 auto; padding: 20px; background: var(--bg); color: var(--text); }
-        .stub { background: #fff3cd; border: 1px solid #ffc107; padding: 20px; border-radius: 6px; margin-top: 40px; }
-        .stub h2 { margin-top: 0; color: #856404; }
-        code { background: #f8f8f8; padding: 2px 6px; border-radius: 3px; }
-    </style>
-</head>
-<body>
-    <header>
-        <h1>%s</h1>
-    </header>
-    <main>
-        <div class="stub">
-            <h2>📄 Page Not Found</h2>
-            <p>This page doesn't exist yet. To create it, add a file named <code>%s.md</code> to your vault.</p>
-        </div>
-    </main>
-</body>
-</html>`, pageID, pageID, pageID)
-}
+// buildPageGraph builds the per-page graph data for a given page:
+// - Links: pages this page wiki-links to
+// - Backlinks: pages that link to this page
+func buildPageGraph(pageID string, linkTargets []string, linkHrefs []string, backlinksMap map[string][]string, existingPages map[string]bool, pageTitles map[string]string, tags []string) *PageGraph {
+	pg := &PageGraph{Links: []GraphRef{}, Backlinks: []GraphRef{}, Tags: tags}
 
-// generateHTMLTemplate creates a simple, clean HTML wrapper
-func generateHTMLTemplate(title string, content string, sourcePath string, pageGraphJSON []byte) string {
-	css := `
-	:root { --bg: #f8f8f8; --text: #333; --link: #2980b9; }
-	body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 850px; margin: 0 auto; padding: 20px; background: var(--bg); color: var(--text); }
-	h1 { border-bottom: 1px solid #e1e4e8; padding-bottom: 10px; }
-	a { color: var(--link); text-decoration: none; font-weight: 500; }
-	a:hover { text-decoration: underline; }
-	a.stub-link { color: #e67e22; font-style: italic; }
-	nav { margin-bottom: 20px; font-size: 0.85em; color: #666; }
-	nav a { color: #666; }
-	.content { margin-top: 20px; }
-	.markdown-body { background: white; padding: 30px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-	p, li { font-size: 16px; }
-	h2 { margin-top: 30px; }
-	#local-graph { height: 300px; border: 1px solid #e1e4e8; border-radius: 6px; margin-top: 20px; background: white; }
-	.backlinks { margin-top: 30px; padding: 15px; background: white; border-radius: 6px; border: 1px solid #e1e4e8; }
-	.backlinks h3 { margin-top: 0; font-size: 0.9em; color: #666; }
-	.backlinks ul { margin: 0; padding-left: 20px; }
-	.backlinks li { font-size: 14px; }
-	`
-
-	navHTML := ""
-	if sourcePath != "" {
-		navHTML = fmt.Sprintf("<nav><a href=\"../graph/index.html\">📊 Graph View</a> — Source: <code>%s</code></nav>", sourcePath)
+	// Build Links — use linkHrefs (computed relative hrefs) not bare target paths
+	for i, target := range linkTargets {
+		href := target + ".html" // fallback
+		if i < len(linkHrefs) {
+			href = linkHrefs[i] + ".html"
+		}
+		pg.Links = append(pg.Links, GraphRef{
+			Title: toHTMLName(target),
+			Href:  href,
+			Stub:  !existingPages[target],
+		})
 	}
 
-	// Backlinks section
-	backlinksHTML := ""
-	var pageGraph PageGraph
-	if err := json.Unmarshal(pageGraphJSON, &pageGraph); err == nil && (len(pageGraph.Links) > 0 || len(pageGraph.Backlinks) > 0) {
-		backlinksHTML = "<div class='backlinks'>"
-		if len(pageGraph.Links) > 0 {
-			backlinksHTML += "<h3>Links</h3><ul>"
-			for _, link := range pageGraph.Links {
-				classAttr := ""
-				if link.Stub {
-					classAttr = " class=\"stub-link\""
-				}
-				backlinksHTML += fmt.Sprintf("<li><a href=\"%s\"%s>%s</a>%s</li>", link.Href, classAttr, link.Title, map[bool]string{true: " (stub)"}[link.Stub])
-			}
-			backlinksHTML += "</ul>"
+	// Build Backlinks — compute relative hrefs from this page's directory
+	for _, source := range backlinksMap[pageID] {
+		title := toHTMLName(source)
+		if t, ok := pageTitles[source]; ok && t != "" {
+			title = t
 		}
-		if len(pageGraph.Backlinks) > 0 {
-			backlinksHTML += "<h3>Backlinks</h3><ul>"
-			for _, bl := range pageGraph.Backlinks {
-				backlinksHTML += fmt.Sprintf("<li><a href=\"%s\">%s</a></li>", bl.Href, bl.Title)
-			}
-			backlinksHTML += "</ul>"
-		}
-		backlinksHTML += "</div>"
+		pg.Backlinks = append(pg.Backlinks, GraphRef{
+			Title: title,
+			Href:  computeRelHref(pageID, source),
+			Stub:  !existingPages[source],
+		})
 	}
 
-	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s - Basalt</title>
-    <style>%s</style>
-</head>
-<body>
-    <header>
-        <h1>%s</h1>
-        %s
-    </header>
-    <main class="content">
-        <div class="markdown-body">
-            %s
-        </div>
-        %s
-        <div id="local-graph"></div>
-    </main>
-    <script>
-    window.pageGraphData = %s;
-    </script>
-    <script src="graph-local.js"></script>
-</body>
-</html>`, title, css, title, navHTML, content, backlinksHTML, pageGraphJSON)
+	return pg
 }
 
-// writeGraphViewer writes the D3 graph viewer to output
-func writeGraphViewer(graphDir string, nodeCount int) {
-	// Main graph viewer (full vault graph)
-	graphHTML := `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Graph View — Basalt</title>
-    <style>
-        :root { --bg: #f8f8f8; --text: #333; --link: #2980b9; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
-        h1 { padding: 20px; margin: 0; font-size: 1.2em; border-bottom: 1px solid #e1e4e8; background: white; }
-        #graph { width: 100vw; height: calc(100vh - 61px); }
-        .node { cursor: pointer; }
-        .node circle { fill: #2980b9; stroke: white; stroke-width: 2px; }
-        .node.stub circle { fill: #e67e22; stroke: #fff; }
-        .node text { font-size: 12px; fill: #333; pointer-events: none; }
-        .link { stroke: #ccc; stroke-width: 1.5px; }
-        .link:hover { stroke: #2980b9; }
-        #legend { position: absolute; top: 70px; right: 20px; background: white; padding: 15px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.85em; }
-        #legend h3 { margin: 0 0 10px; }
-        #legend span { display: inline-block; width: 12px; height: 12px; border-radius: 50%%; margin-right: 6px; vertical-align: middle; }
-        .legend-page { background: #2980b9; }
-        .legend-stub { background: #e67e22; }
-    </style>
-</head>
-<body>
-    <h1>📊 Vault Graph View</h1>
-    <div id="legend">
-        <h3>Legend</h3>
-        <div><span class="legend-page"></span>Page</div>
-        <div><span class="legend-stub"></span>Stub (dead link)</div>
-    </div>
-    <div id="graph"></div>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script>
-    d3.json("graph.json").then(function(graph) {
-        const width = document.getElementById("graph").clientWidth;
-        const height = document.getElementById("graph").clientHeight;
-
-        const svg = d3.select("#graph").append("svg")
-            .attr("width", width)
-            .attr("height", height);
-
-        const simulation = d3.forceSimulation(graph.nodes)
-            .force("link", d3.forceLink(graph.edges).id(d => d.id).distance(80))
-            .force("charge", d3.forceManyBody().strength(-200))
-            .force("center", d3.forceCenter(width / 2, height / 2))
-            .force("collision", d3.forceCollide().radius(30));
-
-        const link = svg.append("g")
-            .selectAll("line")
-            .data(graph.edges)
-            .enter().append("line")
-            .attr("class", "link");
-
-        const node = svg.append("g")
-            .selectAll("g")
-            .data(graph.nodes)
-            .enter().append("g")
-            .attr("class", d => "node" + (d.stub ? " stub" : ""))
-            .call(d3.drag()
-                .on("start", dragstarted)
-                .on("drag", dragged)
-                .on("end", dragended));
-
-        node.append("circle")
-            .attr("r", 8);
-
-        node.append("text")
-            .attr("dx", 12)
-            .attr("dy", 4)
-            .text(d => d.title);
-
-        node.on("click", (event, d) => {
-            if (!d.stub) {
-                window.location.href = "../" + d.path;
-            }
-        });
-
-        node.on("mouseover", function(event, d) {
-            // Highlight connected edges
-            link.style("stroke", l => (l.source.id === d.id || l.target.id === d.id) ? "#2980b9" : "#ccc");
-            link.style("stroke-width", l => (l.source.id === d.id || l.target.id === d.id) ? 3 : 1.5);
-        });
-
-        node.on("mouseout", function() {
-            link.style("stroke", "#ccc").style("stroke-width", 1.5);
-        });
-
-        simulation.on("tick", () => {
-            link
-                .attr("x1", d => d.source.x)
-                .attr("y1", d => d.source.y)
-                .attr("x2", d => d.target.x)
-                .attr("y2", d => d.target.y);
-            node.attr("transform", d => "translate(" + d.x + "," + d.y + ")");
-        });
-
-        function dragstarted(event) {
-            if (!event.active) simulation.alphaTarget(0.3).restart();
-            event.subject.fx = event.subject.x;
-            event.subject.fy = event.subject.y;
-        }
-
-        function dragged(event) {
-            event.subject.fx = event.x;
-            event.subject.fy = event.y;
-        }
-
-        function dragended(event) {
-            if (!event.active) simulation.alphaTarget(0);
-            event.subject.fx = null;
-            event.subject.fy = null;
-        }
-    });
-    </script>
-</body>
-</html>`
-	os.WriteFile(filepath.Join(graphDir, "index.html"), []byte(graphHTML), 0644)
-
-	// Local (per-page) graph viewer
-	localGraphJS := `// graph-local.js — renders local graph for the current page
-(async function() {
-    const container = document.getElementById('local-graph');
-    if (!container || !window.pageGraphData) return;
-
-    const data = window.pageGraphData;
-    if (data.links.length === 0 && data.backlinks.length === 0) {
-        container.style.display = 'none';
-        return;
-    }
-
-    // Build local subgraph
-    const pageId = window.pageGraphData.pageId || location.pathname.split('/').pop().replace('.html', '');
-    const nodes = [{ id: pageId, title: document.title.replace(' - Basalt', ''), current: true }];
-    const nodeIds = new Set([pageId]);
-
-    data.links.forEach(l => {
-        if (!nodeIds.has(l.href.replace('.html', ''))) {
-            nodes.push({ id: l.href.replace('.html', ''), title: l.title, stub: l.stub });
-            nodeIds.add(l.href.replace('.html', ''));
-        }
-    });
-
-    data.backlinks.forEach(bl => {
-        if (!nodeIds.has(bl.href.replace('.html', ''))) {
-            nodes.push({ id: bl.href.replace('.html', ''), title: bl.title });
-            nodeIds.add(bl.href.replace('.html', ''));
-        }
-    });
-
-    const edges = [];
-    data.links.forEach(l => {
-        edges.push({ source: pageId, target: l.href.replace('.html', '') });
-    });
-    data.backlinks.forEach(bl => {
-        edges.push({ source: bl.href.replace('.html', ''), target: pageId });
-    });
-
-    const width = container.clientWidth;
-    const height = 300;
-
-    const svg = d3.select(container).append('svg')
-        .attr('width', width)
-        .attr('height', height);
-
-    const simulation = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(edges).id(d => d.id).distance(60))
-        .force('charge', d3.forceManyBody().strength(-150))
-        .force('center', d3.forceCenter(width / 2, height / 2))
-        .force('collision', d3.forceCollide().radius(25));
-
-    const link = svg.append('g')
-        .selectAll('line')
-        .data(edges)
-        .enter().append('line')
-        .style('stroke', '#ccc')
-        .style('stroke-width', 1.5);
-
-    const node = svg.append('g')
-        .selectAll('g')
-        .data(nodes)
-        .enter().append('g')
-        .attr('class', 'node')
-        .call(d3.drag()
-            .on('start', dragstarted)
-            .on('drag', dragged)
-            .on('end', dragended));
-
-    node.append('circle')
-        .attr('r', d => d.current ? 10 : 6)
-        .style('fill', d => d.stub ? '#e67e22' : (d.current ? '#2980b9' : '#3498db'))
-        .style('stroke', 'white')
-        .style('stroke-width', 2);
-
-    node.append('text')
-        .attr('dx', 10)
-        .attr('dy', 4)
-        .style('font-size', '11px')
-        .style('fill', '#333')
-        .text(d => d.title);
-
-    node.on('click', (event, d) => {
-        if (!d.stub && !d.current) {
-            window.location.href = d.id + '.html';
-        }
-    });
-
-    node.on('mouseover', function(event, d) {
-        link.style('stroke', l => (l.source.id === d.id || l.target.id === d.id) ? '#2980b9' : '#ccc');
-    });
-    node.on('mouseout', function() {
-        link.style('stroke', '#ccc');
-    });
-
-    simulation.on('tick', () => {
-        link
-            .attr('x1', d => d.source.x)
-            .attr('y1', d => d.source.y)
-            .attr('x2', d => d.target.x)
-            .attr('y2', d => d.target.y);
-        node.attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
-    });
-
-    function dragstarted(event) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        event.subject.fx = event.subject.x;
-        event.subject.fy = event.subject.y;
-    }
-    function dragged(event) {
-        event.subject.fx = event.x;
-        event.subject.fy = event.y;
-    }
-    function dragended(event) {
-        if (!event.active) simulation.alphaTarget(0);
-        event.subject.fx = null;
-        event.subject.fy = null;
-    }
-})();
-`
-	os.WriteFile(filepath.Join(graphDir, "graph-local.js"), []byte(localGraphJS), 0644)
+// loadBacklinks reads the backlinks map from backlinks.json
+func loadBacklinks() map[string][]string {
+	var m map[string][]string
+	data, err := os.ReadFile(filepath.Join(OutputDir, "backlinks.json"))
+	if err != nil {
+		return make(map[string][]string)
+	}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return make(map[string][]string)
+	}
+	return m
 }

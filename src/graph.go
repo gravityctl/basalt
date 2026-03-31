@@ -2,9 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -19,7 +22,7 @@ type GraphNode struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
 	Path  string `json:"path"`
-	Stub  bool   `json:"stub"` // true if this was a dead link we stubbed
+	Stub  bool   `json:"stub"`
 }
 
 // GraphEdge represents a link from one page to another
@@ -30,200 +33,252 @@ type GraphEdge struct {
 
 // PageGraph is the per-page graph data injected into each page
 type PageGraph struct {
-	Links     []GraphRef `json:"links"`
-	Backlinks []GraphRef `json:"backlinks"`
+	Links        []GraphRef `json:"links"`
+	Backlinks    []GraphRef `json:"backlinks"`
+	CurrentHref  string     `json:"currentHref"`
+	Tags         []string   `json:"tags"`
 }
 
 // GraphRef is a reference to another page
 type GraphRef struct {
 	Title string `json:"title"`
 	Href  string `json:"href"`
-	Stub  bool   `json:"stub"` // true if target doesn't exist
+	Stub  bool   `json:"stub"`
+}
+
+// NavNode is a node in the navigation tree
+type NavNode struct {
+	Name      string     `json:"name"`
+	Path      string     `json:"path"`
+	Href      string     `json:"href"`
+	IndexHref string    `json:"indexHref,omitempty"`
+	Children  []*NavNode `json:"children,omitempty"`
 }
 
 // wikiLinkRe matches [[Page]] and [[Page|Display Text]]
 var wikiLinkRe = regexp.MustCompile(`\[\[([^\]|]+)(?:\|([^\]]+))?\]\]`)
 
-// extractWikiLinks extracts all wiki-style links from content
-// Returns the cleaned content (with wiki links converted to markdown links)
-// and a list of all link targets found.
-func extractWikiLinks(content []byte) ([]byte, []string) {
-	links := []string{}
-
-	processed := wikiLinkRe.ReplaceAllFunc(content, func(match []byte) []byte {
-		matches := wikiLinkRe.FindSubmatch(match)
-		if len(matches) < 2 {
+// extractWikiLinks extracts wiki-style links from markdown content.
+func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string, []string) {
+	var targets, rels []string
+	result := wikiLinkRe.ReplaceAllFunc(content, func(match []byte) []byte {
+		m := wikiLinkRe.FindSubmatch(match)
+		if len(m) < 2 {
 			return match
 		}
-		target := string(matches[1])
+		target := string(m[1])
 		display := target
-		if len(matches) >= 3 && len(matches[2]) > 0 {
-			display = string(matches[2])
+		if len(m) >= 3 && len(m[2]) > 0 {
+			display = string(m[2])
 		}
-		links = append(links, target)
-		// Convert to standard markdown link
-		return []byte("[" + display + "](../" + toHTMLName(target) + ")")
-	})
+		targets = append(targets, target)
 
-	return processed, links
+		srcDir := filepath.Dir(strings.TrimSuffix(sourceRelPath, ".md"))
+		tgtBase := toHTMLName(target)
+		tgtDir := filepath.Dir(target)
+		rel, _ := filepath.Rel(srcDir, filepath.Join(tgtDir, tgtBase))
+		rels = append(rels, rel)
+
+		linkDisp := toHTMLName(target)
+		if len(m) >= 3 && len(m[2]) > 0 {
+			linkDisp = display
+		}
+		return []byte("[" + linkDisp + "](" + rel + ".html)")
+	})
+	return result, targets, rels
 }
 
-// buildGraph walks the vault and builds the complete link graph
-func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
-	g := &Graph{
-		Nodes: []GraphNode{},
-		Edges: []GraphEdge{},
+// computeRelHref computes relative href from source page to target page.
+func computeRelHref(sourcePageID, targetPageID string) string {
+	sourceDir := filepath.Dir(sourcePageID)
+	rel, err := filepath.Rel(sourceDir, targetPageID)
+	if err != nil {
+		return targetPageID + ".html"
 	}
-	// pageLinks: page path -> list of pages it links to
-	pageLinks := make(map[string][]string)
-	// allPages: set of all page IDs (for backlink computation)
-	allPages := make(map[string]bool)
+	return rel + ".html"
+}
 
-	// First pass: collect all existing pages
-	err := filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !strings.HasSuffix(path, ".md") {
+// buildNavTree walks the vault and builds a hierarchical nav tree.
+// "index" page is always first; folders sorted alphabetically; pages sorted alphabetically.
+func buildNavTree(vaultDir string) []*NavNode {
+	type entry struct{ pageID, title string }
+	entries := []entry{}
+
+	filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || !strings.HasSuffix(path, ".md") {
 			return nil
 		}
-		relPath, _ := filepath.Rel(vaultDir, path)
-		pageID := toHTMLName(strings.TrimSuffix(relPath, ".html"))
-		allPages[pageID] = true
+		rel, _ := filepath.Rel(vaultDir, path)
+		pageID := strings.TrimSuffix(rel, ".md")
+		title := toHTMLName(pageID)
+		if data, readErr := os.ReadFile(path); readErr == nil {
+			if t := extractTitle(data); t != "" && t != "Untitled" {
+				title = t
+			}
+		}
+		entries = append(entries, entry{pageID: pageID, title: title})
 		return nil
 	})
-	if err != nil {
-		return nil, nil, err
+
+	type tn struct {
+		name      string
+		path      string
+		href      string
+		indexHref string
+		children  map[string]*tn
 	}
 
-	// Second pass: extract links from each page
-	err = filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !strings.HasSuffix(path, ".md") {
-			return nil
-		}
+	root := map[string]*tn{"": {name: "", path: "", href: "", indexHref: "", children: map[string]*tn{}}}
 
-		relPath, _ := filepath.Rel(vaultDir, path)
-		sourceID := toHTMLName(strings.TrimSuffix(relPath, ".html"))
-
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-
-		_, links := extractWikiLinks(data)
-
-		pageLinks[sourceID] = links
-
-		// Add edges
-		for _, target := range links {
-			targetID := toHTMLName(target)
-			g.Edges = append(g.Edges, GraphEdge{
-				Source: sourceID,
-				Target: targetID,
-			})
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Build nodes from all pages + stub pages (dead link targets)
-	addedNodes := make(map[string]bool)
-	for pageID := range allPages {
-		g.Nodes = append(g.Nodes, GraphNode{
-			ID:    pageID,
-			Title: pageID,
-			Path:  pageID + ".html",
-			Stub:  false,
-		})
-		addedNodes[pageID] = true
-	}
-
-	// Add stub nodes for dead links
-	for _, links := range pageLinks {
-		for _, target := range links {
-			targetID := toHTMLName(target)
-			if !addedNodes[targetID] {
-				g.Nodes = append(g.Nodes, GraphNode{
-					ID:    targetID,
-					Title: targetID,
-					Path:  targetID + ".html",
-					Stub:  true,
-				})
-				addedNodes[targetID] = true
+	for _, e := range entries {
+		parts := strings.Split(e.pageID, "/")
+		cur := root[""]
+		for i, part := range parts {
+			isLast := i == len(parts)-1
+			// Detect if this part is an "index" page for the parent folder
+			isIndexForParent := isLast && part == "index" && len(parts) > 1
+			if cur.children[part] == nil {
+				if isIndexForParent {
+					// This page IS the index of cur (the parent folder)
+					// Mark the parent folder with indexHref, don't create a separate child node
+					cur.indexHref = e.pageID + ".html"
+				} else {
+					child := &tn{
+						name:      e.title,
+						path:      e.pageID,
+						href:      e.pageID + ".html",
+						indexHref: "",
+						children:  map[string]*tn{},
+					}
+					if !isLast {
+						child.name = part
+						child.path = ""
+						child.href = ""
+					}
+					cur.children[part] = child
+				}
+			} else if isLast && isIndexForParent {
+				// Folder already existed; just mark its indexHref
+				cur.indexHref = e.pageID + ".html"
+			}
+			if !isIndexForParent {
+				cur = cur.children[part]
 			}
 		}
 	}
 
-	// Compute backlinks: for each page, who links to it?
-	backlinks := make(map[string][]string)
-	for source, links := range pageLinks {
-		for _, target := range links {
-			targetID := toHTMLName(target)
-			backlinks[targetID] = append(backlinks[targetID], source)
+	var flatten func(m map[string]*tn) []*NavNode
+	flatten = func(m map[string]*tn) []*NavNode {
+		var result []*NavNode
+		for _, c := range m {
+			node := &NavNode{Name: c.name, Path: c.path, Href: c.href, IndexHref: c.indexHref}
+			if c.href == "" {
+				node.Children = flatten(c.children)
+			}
+			result = append(result, node)
 		}
+		sort.Slice(result, func(i, j int) bool {
+			aIsHome := result[i].Path == "index"
+			bIsHome := result[j].Path == "index"
+			if aIsHome != bIsHome {
+				return aIsHome
+			}
+			aIsFolder := result[i].Href == ""
+			bIsFolder := result[j].Href == ""
+			if aIsFolder != bIsFolder {
+				return aIsFolder
+			}
+			return result[i].Name < result[j].Name
+		})
+		return result
 	}
 
-	// Store backlinks in a global JSON for per-page graph queries
-	backlinksJSON, _ := json.Marshal(backlinks)
-	os.WriteFile(filepath.Join(vaultDir, "..", "output", "backlinks.json"), backlinksJSON, 0644)
-
-	return g, pageLinks, nil
+	return flatten(root[""].children)
 }
 
-// generatePageGraph builds PageGraph for a specific page
-func generatePageGraph(pageID string, pageLinks map[string][]string, vaultDir string) *PageGraph {
-	links := pageLinks[pageID]
-	backlinksMap := make(map[string][]string)
-	// Read from the global backlinks.json
-	data, err := os.ReadFile(filepath.Join(vaultDir, "..", "output", "backlinks.json"))
-	if err == nil {
-		json.Unmarshal(data, &backlinksMap)
-	}
+// buildGraph walks the vault and builds the complete link graph.
+func buildGraph(vaultDir string) (*Graph, map[string][]string, map[string]string, error) {
+	g := &Graph{Nodes: []GraphNode{}, Edges: []GraphEdge{}}
+	allPages := make(map[string]bool)
+	pageTitles := make(map[string]string)
 
-	pg := &PageGraph{
-		Links:     []GraphRef{},
-		Backlinks: []GraphRef{},
-	}
-
-	// Determine which pages actually exist
-	existingPages := make(map[string]bool)
-	filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	err := filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || !strings.HasSuffix(path, ".md") {
+			return nil
 		}
-		if strings.HasSuffix(path, ".md") {
-			relPath, _ := filepath.Rel(vaultDir, path)
-			pageID := toHTMLName(strings.TrimSuffix(relPath, ".html"))
-			existingPages[pageID] = true
+		rel, _ := filepath.Rel(vaultDir, path)
+		pageID := strings.TrimSuffix(rel, ".md")
+		allPages[pageID] = true
+		if data, err := os.ReadFile(path); err == nil {
+			pageTitles[pageID] = extractTitle(data)
 		}
 		return nil
 	})
-
-	// Build Links
-	for _, target := range links {
-		targetID := toHTMLName(target)
-		stub := !existingPages[targetID]
-		pg.Links = append(pg.Links, GraphRef{
-			Title: target,
-			Href:  targetID + ".html",
-			Stub:  stub,
-		})
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	// Build Backlinks
-	for _, source := range backlinksMap[pageID] {
-		pg.Backlinks = append(pg.Backlinks, GraphRef{
-			Title: source,
-			Href:  source + ".html",
-			Stub:  false,
-		})
+	err = filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || !strings.HasSuffix(path, ".md") {
+			return nil
+		}
+		rel, _ := filepath.Rel(vaultDir, path)
+		srcID := strings.TrimSuffix(rel, ".md")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		_, targets, _ := extractWikiLinks(data, rel)
+		for _, tgt := range targets {
+			g.Edges = append(g.Edges, GraphEdge{Source: srcID, Target: tgt})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	return pg
+	added := make(map[string]bool)
+	for id := range allPages {
+		g.Nodes = append(g.Nodes, GraphNode{
+			ID: id, Title: pageTitles[id], Path: id + ".html", Stub: false,
+		})
+		added[id] = true
+	}
+	for _, e := range g.Edges {
+		if !added[e.Target] {
+			g.Nodes = append(g.Nodes, GraphNode{
+				ID: e.Target, Title: toHTMLName(e.Target), Path: e.Target + ".html", Stub: true,
+			})
+			added[e.Target] = true
+		}
+	}
+
+	backlinks := make(map[string][]string)
+	for _, e := range g.Edges {
+		backlinks[e.Target] = append(backlinks[e.Target], e.Source)
+	}
+	bJSON, _ := json.Marshal(backlinks)
+	os.WriteFile(filepath.Join(vaultDir, "..", "output", "backlinks.json"), bJSON, 0644)
+	return g, backlinks, pageTitles, nil
+}
+func pageIDFromRelPath(relPath string) string {
+	return strings.TrimSuffix(relPath, ".md")
+}
+
+func downloadD3(graphDir string) {
+	p := filepath.Join(graphDir, "d3.min.js")
+	if _, err := os.Stat(p); err == nil {
+		return
+	}
+	resp, err := http.Get("https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js")
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	os.WriteFile(p, body, 0644)
 }
