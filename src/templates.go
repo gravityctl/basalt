@@ -169,6 +169,10 @@ window.navTree = %s;
             svg.selectAll('g').attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
         });
         sim.on('end', function() {
+            // Render circles and lines after layout settles
+        });
+        // Render immediately so single-node pages show up
+        {
             var link = svg.append('g').selectAll('line').data(edges).enter().append('line').style('stroke', '#ccc').style('stroke-width', 1.5);
             var node = svg.append('g').selectAll('g').data(nodes).enter().append('g').style('cursor', function(d) { return d.stub || d.current ? 'default' : 'pointer'; })
                 .call(_d3.drag()
@@ -178,7 +182,7 @@ window.navTree = %s;
                 .on('click', function(e, d) { if (!d.stub && !d.current) window.location.href = d.href; });
             node.append('circle').attr('r', function(d) { return d.current ? 7 : 4 }).style('fill', function(d) { return d.stub ? '#e67e22' : (d.current ? '#2980b9' : '#3498db'); }).style('stroke', 'white').style('stroke-width', 1.5);
             node.append('text').attr('dx', 7).attr('dy', 3).style('font-size', '9px').style('fill', '#333').text(function(d) { return d.title; });
-        });
+        }
     }
     var s = document.createElement("script");
     s.src = _d3p;
