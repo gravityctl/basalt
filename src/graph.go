@@ -53,7 +53,7 @@ type NavNode struct {
 }
 
 // wikiLinkRe matches [[Page]] and [[Page|Display Text]]
-var wikiLinkRe = regexp.MustCompile(`\[\[([^\]|]+)(?:\|([^\]]+)?\]\]`)
+var wikiLinkRe = regexp.MustCompile(`\[\[([^\]|]+)(?:\|([^\]]+))?\]\]`)
 
 // extractWikiLinks extracts wiki-style links from markdown content.
 func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string, []string) {
@@ -65,8 +65,8 @@ func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string, [
 		}
 		target := string(m[1])
 		display := target
-		if len(m) >= 3 && len(m[3]) > 0 {
-			display = string(m[3])
+		if len(m) >= 3 && len(m[2]) > 0 {
+			display = string(m[2])
 		}
 		targets = append(targets, target)
 
@@ -77,7 +77,7 @@ func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string, [
 		rels = append(rels, rel)
 
 		linkDisp := toHTMLName(target)
-		if len(m) >= 3 && len(m[3]) > 0 {
+		if len(m) >= 3 && len(m[2]) > 0 {
 			linkDisp = display
 		}
 		return []byte("[" + linkDisp + "](" + rel + ".html)")
@@ -151,25 +151,28 @@ func buildNavTree(vaultDir string) []*NavNode {
 
 	var flatten func(m map[string]*tn) []*NavNode
 	flatten = func(m map[string]*tn) []*NavNode {
-		var dirs, pages []*NavNode
+		var result []*NavNode
 		for _, c := range m {
+			node := &NavNode{Name: c.name, Path: c.path, Href: c.href}
 			if c.href == "" {
-				dirs = append(dirs, &NavNode{Name: c.name, Children: flatten(c.children)})
-			} else {
-				pages = append(pages, &NavNode{Name: c.name, Path: c.path, Href: c.href})
+				node.Children = flatten(c.children)
 			}
+			result = append(result, node)
 		}
-		sort.Slice(dirs, func(i, j int) bool { return dirs[i].Name < dirs[j].Name })
-		sort.Slice(pages, func(i, j int) bool {
-			if pages[i].Name == "index" {
-				return true
+		sort.Slice(result, func(i, j int) bool {
+			aIsHome := result[i].Path == "index"
+			bIsHome := result[j].Path == "index"
+			if aIsHome != bIsHome {
+				return aIsHome
 			}
-			if pages[j].Name == "index" {
-				return false
+			aIsFolder := result[i].Href == ""
+			bIsFolder := result[j].Href == ""
+			if aIsFolder != bIsFolder {
+				return aIsFolder
 			}
-			return pages[i].Name < pages[j].Name
+			return result[i].Name < result[j].Name
 		})
-		return append(dirs, pages...)
+		return result
 	}
 
 	return flatten(root[""].children)
