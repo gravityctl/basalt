@@ -36,6 +36,7 @@ type PageGraph struct {
 	Links        []GraphRef `json:"links"`
 	Backlinks    []GraphRef `json:"backlinks"`
 	CurrentHref  string     `json:"currentHref"`
+	Tags         []string   `json:"tags"`
 }
 
 // GraphRef is a reference to another page

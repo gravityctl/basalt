@@ -12,6 +12,7 @@ import (
 func generateHTMLTemplate(title string, htmlContent string, sourcePath string, pageGraph *PageGraph, navTreeJSON string) string {
 	pageGraphJSON, _ := json.Marshal(pageGraph)
 	backlinksHTML := buildBacklinksHTML(pageGraph)
+	tagsHTML := buildTagsHTML(pageGraph)
 
 	css := `
 	:root { --bg: #f8f8f8; --text: #333; --link: #2980b9; --sidebar-bg: #f0f0f0; --border: #e1e4e8; }
@@ -53,6 +54,9 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.sidebar-links a { color: var(--link); text-decoration: none; font-weight: 500; }
 	.sidebar-links a:hover { text-decoration: underline; }
 	a.stub-link { color: #e67e22; font-style: italic; }
+	.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+	.tags-label { font-size: 0.8em; color: #888; margin-right: 4px; }
+	.tag { display: inline-block; padding: 2px 8px; background: #e8f0f6; color: #2980b9; border-radius: 12px; font-size: 0.8em; font-weight: 500; }
 	`
 
 	return fmt.Sprintf(`<!DOCTYPE html>
@@ -78,6 +82,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     <aside class="sidebar-right">
         <h2>Graph</h2>
         <div id="local-graph"></div>
+        %s
         %s
     </aside>
 </div>
@@ -208,6 +213,7 @@ window.navTree = %s;
 </html>`,
 		title, css, title, htmlContent,
 		backlinksHTML,
+		tagsHTML,
 		string(pageGraphJSON), navTreeJSON)
 }
 
@@ -233,6 +239,19 @@ func buildBacklinksHTML(pg *PageGraph) string {
 		s += "</ul>"
 	}
 	s += "</div></div>"
+	return s
+}
+
+// buildTagsHTML renders the tags section for a page
+func buildTagsHTML(pg *PageGraph) string {
+	if pg == nil || len(pg.Tags) == 0 {
+		return ""
+	}
+	s := "<div class=\"tags\"><span class=\"tags-label\">Tags:</span>"
+	for _, tag := range pg.Tags {
+		s += fmt.Sprintf("<span class=\"tag\">%s</span>", tag)
+	}
+	s += "</div>"
 	return s
 }
 

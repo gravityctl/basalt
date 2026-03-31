@@ -81,6 +81,10 @@ func run() error {
 
 		relPath, _ := filepath.Rel(SourceDir, path)
 
+		// Read raw content for tag extraction before ProcessFile strips frontmatter
+		rawContent, _ := os.ReadFile(path)
+		tags := extractTags(rawContent)
+
 		title, htmlBody, linkTargets, linkHrefs, err := parser.ProcessFile(path, relPath)
 		if err != nil {
 			fmt.Printf("Error processing %s: %v\n", path, err)
@@ -94,7 +98,7 @@ func run() error {
 		}
 
 		// Build per-page graph data
-		pageGraph := buildPageGraph(pageID, linkTargets, linkHrefs, backlinksMap, existingPages, pageTitles)
+		pageGraph := buildPageGraph(pageID, linkTargets, linkHrefs, backlinksMap, existingPages, pageTitles, tags)
 		pageGraph.CurrentHref = pageID + ".html"
 
 		// Write HTML page
@@ -135,8 +139,8 @@ func run() error {
 // buildPageGraph builds the per-page graph data for a given page:
 // - Links: pages this page wiki-links to
 // - Backlinks: pages that link to this page
-func buildPageGraph(pageID string, linkTargets []string, linkHrefs []string, backlinksMap map[string][]string, existingPages map[string]bool, pageTitles map[string]string) *PageGraph {
-	pg := &PageGraph{Links: []GraphRef{}, Backlinks: []GraphRef{}}
+func buildPageGraph(pageID string, linkTargets []string, linkHrefs []string, backlinksMap map[string][]string, existingPages map[string]bool, pageTitles map[string]string, tags []string) *PageGraph {
+	pg := &PageGraph{Links: []GraphRef{}, Backlinks: []GraphRef{}, Tags: tags}
 
 	// Build Links — use linkHrefs (computed relative hrefs) not bare target paths
 	for i, target := range linkTargets {
