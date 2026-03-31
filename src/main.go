@@ -64,6 +64,10 @@ func run() error {
 	// Load backlinks map for per-page backlink lookup
 	backlinksMap := loadBacklinks()
 
+	// Build navigation tree for left sidebar
+	navTree := buildNavTree(SourceDir)
+	navTreeJSON, _ := json.Marshal(navTree)
+
 	parser := NewMarkdownParser()
 
 	// Walk the vault and generate HTML for each markdown file
@@ -94,7 +98,7 @@ func run() error {
 
 		// Write HTML page
 		outputFile := filepath.Join(OutputDir, pageID+".html")
-		html := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraph)
+		html := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraph, string(navTreeJSON))
 		if werr := os.WriteFile(outputFile, []byte(html), 0644); werr != nil {
 			return werr
 		}
