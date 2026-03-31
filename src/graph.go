@@ -33,8 +33,9 @@ type GraphEdge struct {
 
 // PageGraph is the per-page graph data injected into each page
 type PageGraph struct {
-	Links     []GraphRef `json:"links"`
-	Backlinks []GraphRef `json:"backlinks"`
+	Links        []GraphRef `json:"links"`
+	Backlinks    []GraphRef `json:"backlinks"`
+	CurrentHref  string     `json:"currentHref"`
 }
 
 // GraphRef is a reference to another page
@@ -46,10 +47,11 @@ type GraphRef struct {
 
 // NavNode is a node in the navigation tree
 type NavNode struct {
-	Name     string     `json:"name"`
-	Path     string     `json:"path"`
-	Href     string     `json:"href"`
-	Children []*NavNode `json:"children,omitempty"`
+	Name      string     `json:"name"`
+	Path      string     `json:"path"`
+	Href      string     `json:"href"`
+	IndexHref string    `json:"indexHref,omitempty"`
+	Children  []*NavNode `json:"children,omitempty"`
 }
 
 // wikiLinkRe matches [[Page]] and [[Page|Display Text]]
@@ -118,34 +120,49 @@ func buildNavTree(vaultDir string) []*NavNode {
 	})
 
 	type tn struct {
-		name     string
-		path     string
-		href     string
-		children map[string]*tn
+		name      string
+		path      string
+		href      string
+		indexHref string
+		children  map[string]*tn
 	}
 
-	root := map[string]*tn{"": {name: "", path: "", href: "", children: map[string]*tn{}}}
+	root := map[string]*tn{"": {name: "", path: "", href: "", indexHref: "", children: map[string]*tn{}}}
 
 	for _, e := range entries {
 		parts := strings.Split(e.pageID, "/")
 		cur := root[""]
 		for i, part := range parts {
+			isLast := i == len(parts)-1
+			// Detect if this part is an "index" page for the parent folder
+			isIndexForParent := isLast && part == "index" && len(parts) > 1
 			if cur.children[part] == nil {
-				isLeaf := i == len(parts)-1
-				child := &tn{
-					name:     e.title,
-					path:     e.pageID,
-					href:     e.pageID + ".html",
-					children: map[string]*tn{},
+				if isIndexForParent {
+					// This page IS the index of cur (the parent folder)
+					// Mark the parent folder with indexHref, don't create a separate child node
+					cur.indexHref = e.pageID + ".html"
+				} else {
+					child := &tn{
+						name:      e.title,
+						path:      e.pageID,
+						href:      e.pageID + ".html",
+						indexHref: "",
+						children:  map[string]*tn{},
+					}
+					if !isLast {
+						child.name = part
+						child.path = ""
+						child.href = ""
+					}
+					cur.children[part] = child
 				}
-				if !isLeaf {
-					child.name = part
-					child.path = ""
-					child.href = ""
-				}
-				cur.children[part] = child
+			} else if isLast && isIndexForParent {
+				// Folder already existed; just mark its indexHref
+				cur.indexHref = e.pageID + ".html"
 			}
-			cur = cur.children[part]
+			if !isIndexForParent {
+				cur = cur.children[part]
+			}
 		}
 	}
 
@@ -153,7 +170,7 @@ func buildNavTree(vaultDir string) []*NavNode {
 	flatten = func(m map[string]*tn) []*NavNode {
 		var result []*NavNode
 		for _, c := range m {
-			node := &NavNode{Name: c.name, Path: c.path, Href: c.href}
+			node := &NavNode{Name: c.name, Path: c.path, Href: c.href, IndexHref: c.indexHref}
 			if c.href == "" {
 				node.Children = flatten(c.children)
 			}

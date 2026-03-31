@@ -100,20 +100,29 @@ window.navTree = %s;
         var html = '';
         for (var i = 0; i < nodes.length; i++) {
             var node = nodes[i];
+            var depth = (window.pageGraphData && window.pageGraphData.currentHref) ? window.pageGraphData.currentHref.split('/').length - 1 : 0;
+            var prefix = depth > 0 ? '../'.repeat(depth) : '';
             if (node.children) {
                 var fid = 'f-' + Math.random().toString(36).slice(2);
-                html += '<div class="nav-folder">';
-                html += '<div class="nav-folder-header" onclick="toggleNavFolder(this)">';
-                html += '<span class="icon">&#9654;</span> ' + escHtml(node.name);
-                html += '</div>';
+                var folderLabel = escHtml(node.name);
+                if (node.indexHref) {
+                    var folderLink = '<a href="' + prefix + node.indexHref + '" onclick="event.stopPropagation()">' + folderLabel + '</a>';
+                    html += '<div class="nav-folder">';
+                    html += '<div class="nav-folder-header" onclick="toggleNavFolder(this)">';
+                    html += '<span class="icon">&#9654;</span> ' + folderLink;
+                    html += '</div>';
+                } else {
+                    html += '<div class="nav-folder">';
+                    html += '<div class="nav-folder-header" onclick="toggleNavFolder(this)">';
+                    html += '<span class="icon">&#9654;</span> ' + folderLabel;
+                    html += '</div>';
+                }
                 html += '<div class="nav-folder-children" id="' + fid + '">';
                 html += buildNavHTML(node.children);
                 html += '</div></div>';
             } else {
-                var depth = location.pathname.split('/').filter(Boolean).length - 2;
-                var prefix = depth >= 1 ? '../'.repeat(depth) : '';
                 var href = prefix + node.href;
-                var isActive = window.pageGraphData && location.pathname.endsWith(node.href);
+                var isActive = window.pageGraphData && window.pageGraphData.currentHref && window.pageGraphData.currentHref === node.href;
                 var cls = isActive ? 'nav-page active' : 'nav-page';
                 html += '<div class="' + cls + '"><a href="' + href + '">' + escHtml(node.name) + '</a></div>';
             }
@@ -127,9 +136,9 @@ window.navTree = %s;
 <script>
 // ---- D3 graph: load async and draw ----
 (function() {
-    var _sp = location.pathname.split("/").filter(Boolean);
-    var _dp = Math.max(0, _sp.length - 2);
-    var _d3p = (_dp >= 1 ? "../".repeat(_dp) : "") + "graph/d3.min.js";
+    var _cur = window.pageGraphData && window.pageGraphData.currentHref ? window.pageGraphData.currentHref : "";
+    var _dp = _cur.split('/').length - 1;
+    var _d3p = _dp > 0 ? '../'.repeat(_dp) + 'graph/d3.min.js' : 'graph/d3.min.js';
     function drawGraph() {
         var container = document.getElementById('local-graph');
         if (!container || typeof window.d3 === 'undefined') return;

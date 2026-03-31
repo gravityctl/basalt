@@ -95,6 +95,7 @@ func run() error {
 
 		// Build per-page graph data
 		pageGraph := buildPageGraph(pageID, linkTargets, linkHrefs, backlinksMap, existingPages, pageTitles)
+		pageGraph.CurrentHref = pageID + ".html"
 
 		// Write HTML page
 		outputFile := filepath.Join(OutputDir, pageID+".html")
