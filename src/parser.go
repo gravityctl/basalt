@@ -96,3 +96,45 @@ func removeFrontmatter(data []byte) []byte {
 	re := regexp.MustCompile(`(?s)^---\s*\n.*?\n---\n?`)
 	return re.ReplaceAll(data, []byte{})
 }
+
+// extractTags gets the tags list from frontmatter.
+// Handles both array syntax: tags: [tag1, tag2]
+// And multi-line syntax: tags:\n  - tag1\n  - tag2
+func extractTags(data []byte) []string {
+	re := regexp.MustCompile(`(?s)^---\s*\n(.*?)\n---\n?`)
+	if matches := re.FindSubmatch(data); len(matches) > 0 {
+		yamlContent := string(matches[1])
+
+		// Handle inline array: tags: [tag1, tag2, tag3]
+		inlineRe := regexp.MustCompile(`(?m)^tags:\s*\[([^\]]*)\]`)
+		if m := inlineRe.FindSubmatch([]byte(yamlContent)); len(m) > 0 {
+			parts := strings.Split(string(m[1]), ",")
+			var tags []string
+			for _, p := range parts {
+				t := strings.TrimSpace(p)
+				if t != "" {
+					tags = append(tags, t)
+				}
+			}
+			return tags
+		}
+
+		// Handle multi-line list: tags:\n  - tag1\n  - tag2
+		multilineRe := regexp.MustCompile(`(?m)^tags:\s*\n((?:\s+-\s*[^\n]+\n?)+)`)
+		if m := multilineRe.FindSubmatch([]byte(yamlContent)); len(m) > 0 {
+			lines := strings.Split(strings.TrimSpace(string(m[1])), "\n")
+			var tags []string
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "-") {
+					tag := strings.TrimSpace(strings.TrimPrefix(line, "-"))
+					if tag != "" {
+						tags = append(tags, tag)
+					}
+				}
+			}
+			return tags
+		}
+	}
+	return nil
+}
