@@ -32,6 +32,7 @@ type GraphEdge struct {
 type PageGraph struct {
 	Links     []GraphRef `json:"links"`
 	Backlinks []GraphRef `json:"backlinks"`
+	Tags      []string   `json:"tags"`
 }
 
 // GraphRef is a reference to another page
@@ -177,7 +178,7 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, error) {
 }
 
 // generatePageGraph builds PageGraph for a specific page
-func generatePageGraph(pageID string, pageLinks map[string][]string, vaultDir string) *PageGraph {
+func generatePageGraph(pageID string, pageLinks map[string][]string, vaultDir string, tags []string) *PageGraph {
 	links := pageLinks[pageID]
 	backlinksMap := make(map[string][]string)
 	// Read from the global backlinks.json
@@ -189,6 +190,7 @@ func generatePageGraph(pageID string, pageLinks map[string][]string, vaultDir st
 	pg := &PageGraph{
 		Links:     []GraphRef{},
 		Backlinks: []GraphRef{},
+		Tags:      tags,
 	}
 
 	// Determine which pages actually exist

@@ -39,19 +39,20 @@ func NewMarkdownParser() *MarkdownParser {
 }
 
 // ProcessFile reads a markdown file, extracts metadata, and returns HTML
-func (p *MarkdownParser) ProcessFile(filePath string) (string, []byte, error) {
+func (p *MarkdownParser) ProcessFile(filePath string) (string, []byte, []string, error) {
 	rawContent, err := os.ReadFile(filePath)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 
 	title := extractTitle(rawContent)
+	tags := extractTags(rawContent)
 	contentToRender, _ := extractWikiLinks(rawContent)
 
 	// Convert Markdown to HTML
 	var buf bytes.Buffer
 	if err := p.markdown.Convert(contentToRender, &buf); err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
 
 	htmlContent := buf.String()
@@ -61,7 +62,7 @@ func (p *MarkdownParser) ProcessFile(filePath string) (string, []byte, error) {
 	reLink := regexp.MustCompile(`\(([^)]*?\.md)\)`)
 	htmlContent = reLink.ReplaceAllString(htmlContent, "($1html)")
 
-	return title, []byte(htmlContent), nil
+	return title, []byte(htmlContent), tags, nil
 }
 
 // Helper: Extract title from Frontmatter or file
@@ -90,6 +91,48 @@ func extractTitle(data []byte) string {
 
 	// 3. Fallback: Filename
 	return "Untitled"
+}
+
+// Helper: Extract tags from Frontmatter
+// Handles both inline array: tags: [tag1, tag2]
+// And multi-line list: tags:\n  - tag1\n  - tag2
+func extractTags(data []byte) []string {
+	re := regexp.MustCompile(`(?s)^---\s*\n(.*?)\n---\n?`)
+	if matches := re.FindSubmatch(data); len(matches) > 0 {
+		yamlContent := string(matches[1])
+
+		// Handle inline array: tags: [tag1, tag2, tag3]
+		inlineRe := regexp.MustCompile(`(?m)^tags:\s*\[([^\]]*)\]`)
+		if m := inlineRe.FindSubmatch([]byte(yamlContent)); len(m) > 0 {
+			parts := strings.Split(string(m[1]), ",")
+			var tags []string
+			for _, p := range parts {
+				t := strings.TrimSpace(p)
+				if t != "" {
+					tags = append(tags, t)
+				}
+			}
+			return tags
+		}
+
+		// Handle multi-line list: tags:\n  - tag1\n  - tag2
+		multilineRe := regexp.MustCompile(`(?m)^tags:\s*\n((?:\s+-\s*[^\n]+\n?)+)`)
+		if m := multilineRe.FindSubmatch([]byte(yamlContent)); len(m) > 0 {
+			lines := strings.Split(strings.TrimSpace(string(m[1])), "\n")
+			var tags []string
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "-") {
+					tag := strings.TrimSpace(strings.TrimPrefix(line, "-"))
+					if tag != "" {
+						tags = append(tags, tag)
+					}
+				}
+			}
+			return tags
+		}
+	}
+	return nil
 }
 
 // Helper: Clean filename for HTML
@@ -157,7 +200,7 @@ func main() {
 		}
 
 		// Process content
-		title, htmlBody, err := parser.ProcessFile(path)
+		title, htmlBody, tags, err := parser.ProcessFile(path)
 		if err != nil {
 			fmt.Printf("Error processing %s: %v\n", path, err)
 			return nil
@@ -172,11 +215,11 @@ func main() {
 
 		// Get per-page graph data
 		pageID := toHTMLName(relPath)
-		pageGraph := generatePageGraph(pageID, pageLinks, SourceDir)
+		pageGraph := generatePageGraph(pageID, pageLinks, SourceDir, tags)
 		pageGraphJSON, _ := json.Marshal(pageGraph)
 
 		// Generate the HTML Template
-		finalHTML := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraphJSON)
+		finalHTML := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraphJSON, tags)
 
 		// Write to disk
 		err = os.WriteFile(outputFile, []byte(finalHTML), 0644)
@@ -241,7 +284,7 @@ func generateStubHTML(pageID string) string {
 }
 
 // generateHTMLTemplate creates a simple, clean HTML wrapper
-func generateHTMLTemplate(title string, content string, sourcePath string, pageGraphJSON []byte) string {
+func generateHTMLTemplate(title string, content string, sourcePath string, pageGraphJSON []byte, tags []string) string {
 	css := `
 	:root { --bg: #f8f8f8; --text: #333; --link: #2980b9; }
 	body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 850px; margin: 0 auto; padding: 20px; background: var(--bg); color: var(--text); }
@@ -260,6 +303,9 @@ func generateHTMLTemplate(title string, content string, sourcePath string, pageG
 	.backlinks h3 { margin-top: 0; font-size: 0.9em; color: #666; }
 	.backlinks ul { margin: 0; padding-left: 20px; }
 	.backlinks li { font-size: 14px; }
+	.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+	.tags-label { font-size: 0.8em; color: #888; margin-right: 4px; }
+	.tag { display: inline-block; padding: 2px 8px; background: #e8f0f6; color: #2980b9; border-radius: 12px; font-size: 0.8em; font-weight: 500; }
 	`
 
 	navHTML := ""
@@ -293,6 +339,16 @@ func generateHTMLTemplate(title string, content string, sourcePath string, pageG
 		backlinksHTML += "</div>"
 	}
 
+	// Tags section
+	tagsHTML := ""
+	if len(tags) > 0 {
+		tagsHTML = "<div class='tags'><span class='tags-label'>Tags:</span>"
+		for _, tag := range tags {
+			tagsHTML += fmt.Sprintf("<span class='tag'>%s</span>", tag)
+		}
+		tagsHTML += "</div>"
+	}
+
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -312,13 +368,14 @@ func generateHTMLTemplate(title string, content string, sourcePath string, pageG
         </div>
         %s
         <div id="local-graph"></div>
+        %s
     </main>
     <script>
     window.pageGraphData = %s;
     </script>
     <script src="graph-local.js"></script>
 </body>
-</html>`, title, css, title, navHTML, content, backlinksHTML, pageGraphJSON)
+</html>`, title, css, title, navHTML, content, backlinksHTML, tagsHTML, pageGraphJSON)
 }
 
 // writeGraphViewer writes the D3 graph viewer to output
