@@ -164,16 +164,20 @@ func buildNavTree(vaultDir string) []*NavNode {
 		// Add the page as a leaf
 		current.Children = append(current.Children, node)
 	}
-
-	// Sort each level: folders first (alphabetically), then pages (alphabetically)
+	// Sort: home page first, then folders (alphabetical), then other pages (alphabetical)
 	var sortNodes func([]*NavNode)
 	sortNodes = func(nodes []*NavNode) {
 		sort.Slice(nodes, func(i, j int) bool {
 			a, b := nodes[i], nodes[j]
+			aIsHome := a.Path == "index"
+			bIsHome := b.Path == "index"
+			if aIsHome != bIsHome {
+				return aIsHome
+			}
 			aIsFolder := a.Href == ""
 			bIsFolder := b.Href == ""
 			if aIsFolder != bIsFolder {
-				return aIsFolder // folders first
+				return aIsFolder
 			}
 			return strings.ToLower(a.Name) < strings.ToLower(b.Name)
 		})
@@ -182,6 +186,7 @@ func buildNavTree(vaultDir string) []*NavNode {
 				sortNodes(n.Children)
 			}
 		}
+	}
 	}
 	sortNodes(root.Children)
 
