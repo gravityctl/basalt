@@ -158,31 +158,31 @@ window.navTree = %s;
         var w = container.clientWidth || 180;
         var h = 180;
         var svg = _d3.select(container).append('svg').attr('width', w).attr('height', h);
+        // Create SVG groups BEFORE simulation starts so tick can update them
+        var linkG = svg.append('g');
+        var nodeG = svg.append('g');
         var sim = _d3.forceSimulation(nodes)
             .force('link', _d3.forceLink(edges).id(function(d) { return d.id; }).distance(40))
             .force('charge', _d3.forceManyBody().strength(-80))
             .force('center', _d3.forceCenter(w / 2, h / 2))
             .force('collision', _d3.forceCollide().radius(15));
+        // Render nodes/links immediately (before sim ticks)
+        var link = linkG.selectAll('line').data(edges).enter().append('line').style('stroke', '#ccc').style('stroke-width', 1.5);
+        var node = nodeG.selectAll('g').data(nodes).enter().append('g')
+            .style('cursor', function(d) { return d.stub || d.current ? 'default' : 'pointer'; })
+            .call(_d3.drag()
+                .on('start', function(e) { if (!e.active) sim.alphaTarget(0.3).restart(); e.subject.fx = e.subject.x; e.subject.fy = e.subject.y; })
+                .on('drag', function(e) { e.subject.fx = e.x; e.subject.fy = e.y; })
+                .on('end', function(e) { if (!e.active) sim.alphaTarget(0); e.subject.fx = null; e.subject.fy = null; }))
+            .on('click', function(e, d) { if (!d.stub && !d.current) window.location.href = d.href; });
+        node.append('circle').attr('r', function(d) { return d.current ? 7 : 4 }).style('fill', function(d) { return d.stub ? '#e67e22' : (d.current ? '#2980b9' : '#3498db'); }).style('stroke', 'white').style('stroke-width', 1.5);
+        node.append('text').attr('dx', 7).attr('dy', 3).style('font-size', '9px').style('fill', '#333').text(function(d) { return d.title; });
+        // Update positions on every tick
         sim.on('tick', function() {
-            svg.selectAll('line').attr('x1', function(d) { return d.source.x; }).attr('y1', function(d) { return d.source.y; })
+            link.attr('x1', function(d) { return d.source.x; }).attr('y1', function(d) { return d.source.y; })
               .attr('x2', function(d) { return d.target.x; }).attr('y2', function(d) { return d.target.y; });
-            svg.selectAll('g').attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+            node.attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
         });
-        sim.on('end', function() {
-            // Render circles and lines after layout settles
-        });
-        // Render immediately so single-node pages show up
-        {
-            var link = svg.append('g').selectAll('line').data(edges).enter().append('line').style('stroke', '#ccc').style('stroke-width', 1.5);
-            var node = svg.append('g').selectAll('g').data(nodes).enter().append('g').style('cursor', function(d) { return d.stub || d.current ? 'default' : 'pointer'; })
-                .call(_d3.drag()
-                    .on('start', function(e) { if (!e.active) sim.alphaTarget(0.3).restart(); e.subject.fx = e.subject.x; e.subject.fy = e.subject.y; })
-                    .on('drag', function(e) { e.subject.fx = e.x; e.subject.fy = e.y; })
-                    .on('end', function(e) { if (!e.active) sim.alphaTarget(0); e.subject.fx = null; e.subject.fy = null; }))
-                .on('click', function(e, d) { if (!d.stub && !d.current) window.location.href = d.href; });
-            node.append('circle').attr('r', function(d) { return d.current ? 7 : 4 }).style('fill', function(d) { return d.stub ? '#e67e22' : (d.current ? '#2980b9' : '#3498db'); }).style('stroke', 'white').style('stroke-width', 1.5);
-            node.append('text').attr('dx', 7).attr('dy', 3).style('font-size', '9px').style('fill', '#333').text(function(d) { return d.title; });
-        }
     }
     var s = document.createElement("script");
     s.src = _d3p;
