@@ -187,7 +187,6 @@ func buildNavTree(vaultDir string) []*NavNode {
 			}
 		}
 	}
-	}
 	sortNodes(root.Children)
 
 	return root.Children
