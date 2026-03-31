@@ -56,7 +56,7 @@ type NavNode struct {
 var wikiLinkRe = regexp.MustCompile(`\[\[([^\]|]+)(?:\|([^\]]+)?\]\]`)
 
 // extractWikiLinks extracts wiki-style links from markdown content.
-func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string, []string, error) {
+func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string, []string) {
 	var targets, rels []string
 	result := wikiLinkRe.ReplaceAllFunc(content, func(match []byte) []byte {
 		m := wikiLinkRe.FindSubmatch(match)
@@ -73,10 +73,7 @@ func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string, [
 		srcDir := filepath.Dir(strings.TrimSuffix(sourceRelPath, ".md"))
 		tgtBase := toHTMLName(target)
 		tgtDir := filepath.Dir(target)
-		rel, err := filepath.Rel(srcDir, filepath.Join(tgtDir, tgtBase))
-		if err != nil {
-			rel = tgtBase
-		}
+		rel, _ := filepath.Rel(srcDir, filepath.Join(tgtDir, tgtBase))
 		rels = append(rels, rel)
 
 		linkDisp := toHTMLName(target)
@@ -85,17 +82,17 @@ func extractWikiLinks(content []byte, sourceRelPath string) ([]byte, []string, [
 		}
 		return []byte("[" + linkDisp + "](" + rel + ".html)")
 	})
-	return result, targets, rels, nil
+	return result, targets, rels
 }
 
 // computeRelHref computes relative href from source page to target page.
 func computeRelHref(sourcePageID, targetPageID string) string {
-	rel, err := filepath.Dir(sourcePageID), targetPageID
-	r, err := filepath.Rel(rel, targetPageID)
+	sourceDir := filepath.Dir(sourcePageID)
+	rel, err := filepath.Rel(sourceDir, targetPageID)
 	if err != nil {
 		return targetPageID + ".html"
 	}
-	return r + ".html"
+	return rel + ".html"
 }
 
 // buildNavTree walks the vault and builds a hierarchical nav tree.
@@ -210,7 +207,7 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, map[string]string
 		if err != nil {
 			return nil
 		}
-		_, targets, _, _ := extractWikiLinks(data, rel)
+		_, targets, _ := extractWikiLinks(data, rel)
 		for _, tgt := range targets {
 			g.Edges = append(g.Edges, GraphEdge{Source: srcID, Target: tgt})
 		}
@@ -244,22 +241,6 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, map[string]string
 	os.WriteFile(filepath.Join(vaultDir, "..", "output", "backlinks.json"), bJSON, 0644)
 	return g, backlinks, pageTitles, nil
 }
-
-func toHTMLName(path string) string {
-	return strings.TrimSuffix(filepath.Base(path), ".md")
-}
-
-// extractTitle extracts title from YAML frontmatter or first H1
-func extractTitle(data []byte) string {
-	if m := regexp.MustCompile(`(?m)^title:\s*(.+)\s*$`).FindSubmatch(data); len(m) > 0 {
-		return strings.TrimSpace(string(m[1]))
-	}
-	if m := regexp.MustCompile(`(?m)^#\s+(.+)\s*$`).FindSubmatch(data); len(m) > 1 {
-		return strings.TrimSpace(string(m[1]))
-	}
-	return ""
-}
-
 func pageIDFromRelPath(relPath string) string {
 	return strings.TrimSuffix(relPath, ".md")
 }
