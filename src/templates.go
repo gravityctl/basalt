@@ -141,7 +141,8 @@ window.navTree = %s;
     var _d3p = _dp > 0 ? '../'.repeat(_dp) + 'graph/d3.min.js' : 'graph/d3.min.js';
     function drawGraph() {
         var container = document.getElementById('local-graph');
-        if (!container || typeof window.d3 === 'undefined') return;
+        if (!container) { console.log('graph: no container'); return; }
+        if (typeof window.d3 === 'undefined') { console.log('graph: d3 not loaded, path=' + _d3p); return; }
         var data = window.pageGraphData;
         if (!data || (data.links.length === 0 && data.backlinks.length === 0)) { container.style.display = 'none'; return; }
         var _d3 = window.d3;
@@ -149,8 +150,8 @@ window.navTree = %s;
         var nodes = [{ id: pageId, title: document.title.replace(' - Basalt', ''), href: location.pathname.split('/').filter(Boolean).pop(), current: true }];
         var nodeIds = {};
         nodeIds[pageId] = true;
-        data.links.forEach(function(l) { var id = l.href.replace('.html',''); if (!nodeIds[id]) { nodes.push({ id: id, title: l.title, href: l.href, stub: l.stub }); nodeIds[id] = true; } });
-        data.backlinks.forEach(function(bl) { var id = bl.href.replace('.html',''); if (!nodeIds[id]) { nodes.push({ id: id, title: bl.title, href: bl.href }); nodeIds[id] = true; } });
+        data.links.forEach(function(l) { var id = l.href.replace('.html',''); if (!nodeIds[id] { nodes.push({ id: id, title: l.title, href: l.href, stub: l.stub }); nodeIds[id] = true; } });
+        data.backlinks.forEach(function(bl) { var id = bl.href.replace('.html',''); if (!nodeIds[id] { nodes.push({ id: id, title: bl.title, href: bl.href }); nodeIds[id] = true; } });
         var edges = [];
         data.links.forEach(function(l) { edges.push({ source: pageId, target: l.href.replace('.html','') }); });
         data.backlinks.forEach(function(bl) { edges.push({ source: bl.href.replace('.html',''), target: pageId }); });
