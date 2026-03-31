@@ -142,10 +142,9 @@ window.navTree = %s;
     function drawGraph() {
         var container = document.getElementById('local-graph');
         if (!container) { console.log('graph: no container'); return; }
-        if (typeof window.d3 === 'undefined') { console.log('graph: d3 not loaded, path=' + _d3p); return; }
-        var data = window.pageGraphData;
-        if (!data || (data.links.length === 0 && data.backlinks.length === 0)) { container.style.display = 'none'; return; }
+        if (typeof window.d3 === 'undefined') { console.log('graph: d3 not loaded'); return; }
         var _d3 = window.d3;
+        var data = window.pageGraphData;
         var pageId = location.pathname.split('/').filter(Boolean).pop().replace('.html', '');
         var nodes = [{ id: pageId, title: document.title.replace(' - Basalt', ''), href: location.pathname.split('/').filter(Boolean).pop(), current: true }];
         var nodeIds = {};
