@@ -15,17 +15,21 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	tagsHTML := buildTagsHTML(pageGraph)
 
 	css := `
-	:root { --bg: #f8f8f8; --text: #333; --link: #2980b9; --sidebar-bg: #f0f0f0; --border: #e1e4e8; }
+	/* Dark mode (default) */
+	:root, [data-theme="dark"] { --bg: #1e1e1e; --text: #e0e0e0; --link: #6bb3d9; --sidebar-bg: #252525; --border: #3a3a3a; --heading: #ffffff; --muted: #888888; --card-bg: #2a2a2a; }
+	/* Light mode */
+	[data-theme="light"] { --bg: #f8f8f8; --text: #333; --link: #2980b9; --sidebar-bg: #f0f0f0; --border: #e1e4e8; --heading: #1a1a1a; --muted: #888888; --card-bg: #ffffff; }
 	* { box-sizing: border-box; }
 	body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; margin: 0; background: var(--bg); color: var(--text); display: flex; min-height: 100vh; }
 	.layout { display: grid; grid-template-columns: 1fr 2fr 1fr; width: 100%; max-width: 100vw; align-items: start; }
 	/* Left sidebar — nav */
 	.sidebar-nav { background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
-	.sidebar-nav h2 { margin: 0 0 12px; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; color: #888; }
+	.sidebar-nav h2 { margin: 0 0 12px; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 	.nav-tree { font-size: 0.9em; }
 	.nav-folder { margin: 4px 0; }
 	.nav-folder-header { cursor: pointer; padding: 4px 6px; border-radius: 4px; display: flex; align-items: center; gap: 4px; color: var(--text); user-select: none; }
-	.nav-folder-header:hover { background: rgba(0,0,0,0.05); }
+	.nav-folder-header:hover { background: rgba(255,255,255,0.05); }
+	[data-theme="light"] .nav-folder-header:hover { background: rgba(0,0,0,0.05); }
 	.nav-folder-header .icon { font-size: 0.7em; transition: transform 0.15s; display: inline-block; }
 	.nav-folder-header .icon.open { transform: rotate(90deg); }
 	.nav-folder-children { padding-left: 16px; display: none; }
@@ -33,34 +37,41 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.nav-page { padding: 4px 6px; border-radius: 4px; }
 	.nav-page a { color: var(--link); text-decoration: none; font-weight: 400; }
 	.nav-page a:hover { text-decoration: underline; }
-	.nav-page.active a { font-weight: 600; color: #1a5f8a; }
+	.nav-page.active a { font-weight: 600; color: var(--link); }
 	/* Center content */
 	.content-col { padding: 20px; min-width: 0; }
-	.content-col h1 { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 20px; font-size: 1.5em; }
-	.markdown-body { background: white; padding: 24px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+	.content-col h1 { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 20px; font-size: 1.5em; color: var(--heading); }
+	.markdown-body { background: var(--card-bg); padding: 24px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 	.markdown-body p, .markdown-body li { font-size: 16px; }
-	.markdown-body h2 { margin-top: 28px; }
+	.markdown-body h2 { margin-top: 28px; color: var(--heading); }
+	.markdown-body h3 { color: var(--heading); }
 	.markdown-body a { color: var(--link); text-decoration: none; font-weight: 500; }
 	.markdown-body a:hover { text-decoration: underline; }
 	/* Right sidebar */
 	.sidebar-right { background: var(--sidebar-bg); border-left: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
-	.sidebar-right h2 { margin: 0 0 12px; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; color: #888; }
-	#local-graph { width: 100%; height: 180px; background: white; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 16px; }
+	.sidebar-right h2 { margin: 0 0 12px; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+	#local-graph { width: 100%; height: 180px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 16px; }
 	.sidebar-section { margin-bottom: 16px; }
-	.sidebar-section h3 { margin: 0 0 8px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.05em; color: #888; }
-	.sidebar-links { background: white; border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-size: 0.85em; }
+	.sidebar-section h3 { margin: 0 0 8px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+	.sidebar-links { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-size: 0.85em; }
 	.sidebar-links ul { margin: 0; padding-left: 16px; }
 	.sidebar-links li { margin: 4px 0; }
 	.sidebar-links a { color: var(--link); text-decoration: none; font-weight: 500; }
 	.sidebar-links a:hover { text-decoration: underline; }
 	a.stub-link { color: #e67e22; font-style: italic; }
 	.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-	.tags-label { font-size: 0.8em; color: #888; margin-right: 4px; }
-	.tag { display: inline-block; padding: 2px 8px; background: #e8f0f6; color: #2980b9; border-radius: 12px; font-size: 0.8em; font-weight: 500; }
+	.tags-label { font-size: 0.8em; color: var(--muted); margin-right: 4px; }
+	.tag { display: inline-block; padding: 2px 8px; background: var(--link); color: var(--bg); border-radius: 12px; font-size: 0.8em; font-weight: 500; opacity: 0.85; }
+	/* Theme toggle */
+	.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+	.sidebar-header h2 { margin: 0; }
+	.theme-toggle { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 1.2em; line-height: 1; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; }
+	.theme-toggle:hover { color: var(--text); }
+	.theme-toggle svg { width: 1em; height: 1em; }
 	`
 
 	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -70,7 +81,10 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 <body>
 <div class="layout">
     <aside class="sidebar-nav">
-        <h2>Nav</h2>
+        <div class="sidebar-header">
+            <h2>Nav</h2>
+            <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">&#9788;</button>
+        </div>
         <nav class="nav-tree" id="nav-tree"></nav>
     </aside>
     <main class="content-col">
@@ -136,6 +150,36 @@ window.navTree = %s;
     }
     var navEl = document.getElementById('nav-tree');
     if (navEl) navEl.innerHTML = buildNavHTML(window.navTree || []);
+})();
+</script>
+<script>
+// ---- Theme toggle ----
+(function() {
+    var html = document.documentElement;
+    var toggle = document.getElementById('theme-toggle');
+    // Apply saved preference or default to dark
+    var saved = localStorage.getItem('basalt-theme');
+    if (saved) { html.setAttribute('data-theme', saved); }
+    else { html.setAttribute('data-theme', 'dark'); }
+    updateIcon();
+    toggle.addEventListener('click', function() {
+        var current = html.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('basalt-theme', next);
+        updateIcon();
+    });
+    function updateIcon() {
+        var isDark = html.getAttribute('data-theme') === 'dark';
+        // Inline SVG icons that use currentColor (matches text color)
+        if (isDark) {
+            toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+            toggle.title = 'Switch to light mode';
+        } else {
+            toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+            toggle.title = 'Switch to dark mode';
+        }
+    }
 })();
 </script>
 <script>
