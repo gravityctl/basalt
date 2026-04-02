@@ -2,13 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -58,13 +58,13 @@ type GraphRef struct {
 // extractTOC extracts heading entries from rendered HTML for table of contents.
 // Matches headings with auto-generated IDs like <h2 id="some-heading">Text</h2>
 func extractTOC(htmlBody []byte) []TOCEntry {
-	re := regexp.MustCompile(`<h([1-6])\s+id="([^"]+)"[^>]*>([^<]*)</h[1-6]>`)
+	// Match <hN id="...">text</hN> — goldmark's auto-ID format
+	re := regexp.MustCompile(`(?i)<h([1-6])\s+[^>]*id="([^"]+)"[^>]*>([^<]*)</h[1-6]>`)
 	matches := re.FindAllSubmatch(htmlBody, -1)
 	var toc []TOCEntry
 	for _, m := range matches {
 		if len(m) >= 4 {
-			level := 1
-			fmt.Sscanf(string(m[1]), "%d", &level)
+			level, _ := strconv.Atoi(string(m[1]))
 			id := string(m[2])
 			text := string(m[3])
 			toc = append(toc, TOCEntry{Level: level, Text: text, ID: id})

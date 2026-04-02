@@ -70,11 +70,12 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.toc-item { margin: 2px 0; }
 	.toc-item a { color: var(--link); text-decoration: none; }
 	.toc-item a:hover { text-decoration: underline; }
-	.toc-item.level-2 { padding-left: 0; }
-	.toc-item.level-3 { padding-left: 12px; }
-	.toc-item.level-4 { padding-left: 24px; }
-	.toc-item.level-5 { padding-left: 36px; }
-	.toc-item.level-6 { padding-left: 48px; }
+	.toc-item.level-1 { padding-left: 0; }
+	.toc-item.level-2 { padding-left: 12px; }
+	.toc-item.level-3 { padding-left: 24px; }
+	.toc-item.level-4 { padding-left: 36px; }
+	.toc-item.level-5 { padding-left: 48px; }
+	.toc-item.level-6 { padding-left: 60px; }
 	/* Theme toggle */
 	.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 	.sidebar-header h2 { margin: 0; }
@@ -321,11 +322,7 @@ func buildTocHTML(pg *PageGraph) string {
 	}
 	s := "<div class=\"toc\"><h3>On this page</h3><ul class=\"toc-list\">"
 	for _, entry := range pg.TableOfContents {
-		level := entry.Level
-		if level < 2 {
-			level = 2 // treat h1 as h2 for indentation purposes
-		}
-		s += fmt.Sprintf("<li class=\"toc-item level-%d\"><a href=\"#%s\">%s</a></li>", level, entry.ID, entry.Text)
+		s += fmt.Sprintf("<li class=\"toc-item level-%d\"><a href=\"#%s\">%s</a></li>", entry.Level, entry.ID, entry.Text)
 	}
 	s += "</ul></div>"
 	return s
