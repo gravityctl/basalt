@@ -65,7 +65,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	/* Theme toggle */
 	.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 	.sidebar-header h2 { margin: 0; }
-	.theme-toggle { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 1.1em; line-height: 1; }
+	.theme-toggle { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 1.5em; line-height: 1; }
 	.theme-toggle:hover { color: var(--text); }
 	`
 
@@ -170,7 +170,7 @@ window.navTree = %s;
     });
     function updateIcon() {
         var isDark = html.getAttribute('data-theme') === 'dark';
-        toggle.innerHTML = isDark ? '&#9728;' : '&#9790;';
+        toggle.innerHTML = isDark ? '&#127769;' : '&#9788;';
         toggle.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
     }
 })();
