@@ -85,13 +85,14 @@ func run() error {
 		rawContent, _ := os.ReadFile(path)
 		tags := extractTags(rawContent)
 		date := extractDate(rawContent)
-		readingTime := computeReadingTime(htmlBody)
 
 		title, htmlBody, linkTargets, linkHrefs, err := parser.ProcessFile(path, relPath)
 		if err != nil {
 			fmt.Printf("Error processing %s: %v\n", path, err)
 			return nil
 		}
+
+		readingTime := computeReadingTime(htmlBody)
 
 		pageID := filepath.Join(filepath.Dir(relPath), toHTMLName(relPath))
 		outputSubdir := filepath.Join(OutputDir, filepath.Dir(relPath))
