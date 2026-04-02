@@ -13,6 +13,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	pageGraphJSON, _ := json.Marshal(pageGraph)
 	backlinksHTML := buildBacklinksHTML(pageGraph)
 	tagsHTML := buildTagsHTML(pageGraph)
+	tocHTML := buildTocHTML(pageGraph)
 
 	css := `
 	/* Dark mode (default) */
@@ -62,6 +63,18 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 	.tags-label { font-size: 0.8em; color: var(--muted); margin-right: 4px; }
 	.tag { display: inline-block; padding: 2px 8px; background: var(--link); color: var(--bg); border-radius: 12px; font-size: 0.8em; font-weight: 500; opacity: 0.85; }
+	/* Table of contents */
+	.toc { margin-top: 16px; font-size: 0.85em; }
+	.toc h3 { margin: 0 0 8px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+	.toc-list { list-style: none; margin: 0; padding: 0; }
+	.toc-item { margin: 2px 0; }
+	.toc-item a { color: var(--link); text-decoration: none; }
+	.toc-item a:hover { text-decoration: underline; }
+	.toc-item.level-2 { padding-left: 0; }
+	.toc-item.level-3 { padding-left: 12px; }
+	.toc-item.level-4 { padding-left: 24px; }
+	.toc-item.level-5 { padding-left: 36px; }
+	.toc-item.level-6 { padding-left: 48px; }
 	/* Theme toggle */
 	.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 	.sidebar-header h2 { margin: 0; }
@@ -96,6 +109,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     <aside class="sidebar-right">
         <h2>Graph</h2>
         <div id="local-graph"></div>
+        %s
         %s
         %s
     </aside>
@@ -258,6 +272,7 @@ window.navTree = %s;
 		title, css, title, htmlContent,
 		backlinksHTML,
 		tagsHTML,
+		tocHTML,
 		string(pageGraphJSON), navTreeJSON)
 }
 
@@ -296,6 +311,23 @@ func buildTagsHTML(pg *PageGraph) string {
 		s += fmt.Sprintf("<span class=\"tag\">%s</span>", tag)
 	}
 	s += "</div>"
+	return s
+}
+
+// buildTocHTML renders the table of contents for the sidebar
+func buildTocHTML(pg *PageGraph) string {
+	if pg == nil || len(pg.TableOfContents) == 0 {
+		return ""
+	}
+	s := "<div class=\"toc\"><h3>On this page</h3><ul class=\"toc-list\">"
+	for _, entry := range pg.TableOfContents {
+		level := entry.Level
+		if level < 2 {
+			level = 2 // treat h1 as h2 for indentation purposes
+		}
+		s += fmt.Sprintf("<li class=\"toc-item level-%d\"><a href=\"#%s\">%s</a></li>", level, entry.ID, entry.Text)
+	}
+	s += "</ul></div>"
 	return s
 }
 

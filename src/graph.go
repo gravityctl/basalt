@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -33,10 +34,18 @@ type GraphEdge struct {
 
 // PageGraph is the per-page graph data injected into each page
 type PageGraph struct {
-	Links        []GraphRef `json:"links"`
-	Backlinks    []GraphRef `json:"backlinks"`
-	CurrentHref  string     `json:"currentHref"`
-	Tags         []string   `json:"tags"`
+	Links             []GraphRef `json:"links"`
+	Backlinks         []GraphRef `json:"backlinks"`
+	CurrentHref       string     `json:"currentHref"`
+	Tags              []string    `json:"tags"`
+	TableOfContents   []TOCEntry `json:"tableOfContents"`
+}
+
+// TOCEntry is a heading entry in the table of contents
+type TOCEntry struct {
+	Level int    `json:"level"` // 1 = h1, 2 = h2, etc.
+	Text  string `json:"text"`
+	ID    string `json:"id"`
 }
 
 // GraphRef is a reference to another page
@@ -44,6 +53,24 @@ type GraphRef struct {
 	Title string `json:"title"`
 	Href  string `json:"href"`
 	Stub  bool   `json:"stub"`
+}
+
+// extractTOC extracts heading entries from rendered HTML for table of contents.
+// Matches headings with auto-generated IDs like <h2 id="some-heading">Text</h2>
+func extractTOC(htmlBody []byte) []TOCEntry {
+	re := regexp.MustCompile(`<h([1-6])\s+id="([^"]+)"[^>]*>([^<]*)</h[1-6]>`)
+	matches := re.FindAllSubmatch(htmlBody, -1)
+	var toc []TOCEntry
+	for _, m := range matches {
+		if len(m) >= 4 {
+			level := 1
+			fmt.Sscanf(string(m[1]), "%d", &level)
+			id := string(m[2])
+			text := string(m[3])
+			toc = append(toc, TOCEntry{Level: level, Text: text, ID: id})
+		}
+	}
+	return toc
 }
 
 // NavNode is a node in the navigation tree
