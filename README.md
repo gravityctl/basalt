@@ -10,6 +10,8 @@ A static-site-generator for my obsidian vault.
 - [x] light/dark mode
 - [ ] plug-and-play
 - [ ] ci/cd
+- [ ] file and text search
+- [ ] table contents
 
 ## Setup
 
