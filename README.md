@@ -4,10 +4,10 @@ A static-site-generator for my obsidian vault.
 
 ## Goals
 
-- [ ] graph views
-- [ ] page linking
-- [ ] header parsing
-- [ ] light/dark mode
+- [ x ] graph views
+- [ x ] page linking
+- [ x ] header parsing
+- [ x ] light/dark mode
 - [ ] plug-and-play
 - [ ] ci/cd
 
