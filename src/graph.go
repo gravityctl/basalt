@@ -34,11 +34,13 @@ type GraphEdge struct {
 
 // PageGraph is the per-page graph data injected into each page
 type PageGraph struct {
-	Links             []GraphRef `json:"links"`
-	Backlinks         []GraphRef `json:"backlinks"`
-	CurrentHref       string     `json:"currentHref"`
-	Tags              []string    `json:"tags"`
-	TableOfContents   []TOCEntry `json:"tableOfContents"`
+	Links           []GraphRef `json:"links"`
+	Backlinks       []GraphRef `json:"backlinks"`
+	CurrentHref     string     `json:"currentHref"`
+	Tags            []string   `json:"tags"`
+	TableOfContents []TOCEntry `json:"tableOfContents"`
+	Date            string     `json:"date"`
+	ReadingTime     string     `json:"readingTime"`
 }
 
 // TOCEntry is a heading entry in the table of contents

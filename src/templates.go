@@ -42,7 +42,10 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.nav-page.active a { font-weight: 700; text-decoration: underline; color: var(--link); }
 	/* Center content */
 	.content-col { padding: 20px; min-width: 0; }
-	.content-col h1 { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 20px; font-size: 1.5em; color: var(--heading); }
+	.content-col h1 { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 6px; font-size: 1.5em; color: var(--heading); }
+	.page-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 0.8em; color: var(--muted); }
+	.page-meta-left { font-style: italic; }
+	.page-meta-right { font-style: normal; }
 	.markdown-body { background: var(--card-bg); padding: 24px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 	.markdown-body p, .markdown-body li { font-size: 16px; }
 	.markdown-body h2 { margin-top: 28px; color: var(--heading); }
@@ -104,6 +107,10 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     </aside>
     <main class="content-col">
         <h1>%s</h1>
+        <div class="page-meta">
+            <span class="page-meta-left">%s</span>
+            <span class="page-meta-right">%s</span>
+        </div>
         <div class="markdown-body">
             %s
         </div>
@@ -271,7 +278,10 @@ window.navTree = %s;
 </script>
 </body>
 </html>`,
-		title, css, title, htmlContent,
+		title, css, title,
+		pageGraph.ReadingTime,
+		pageGraph.Date,
+		htmlContent,
 		backlinksHTML,
 		tagsHTML,
 		tocHTML,
