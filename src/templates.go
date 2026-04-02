@@ -36,9 +36,10 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.nav-folder-children { padding-left: 16px; display: none; }
 	.nav-folder-children.open { display: block; }
 	.nav-page { padding: 4px 6px; border-radius: 4px; }
-	.nav-page a { color: var(--link); text-decoration: none; font-weight: 400; }
-	.nav-page a:hover { text-decoration: underline; }
-	.nav-page.active a { font-weight: 600; color: var(--link); }
+	.nav-page a, .nav-folder-header a { color: var(--link); text-decoration: none; font-weight: 400; }
+	.nav-page a:visited, .nav-folder-header a:visited { color: var(--link); }
+	.nav-page a:hover, .nav-folder-header a:hover { text-decoration: underline; }
+	.nav-page.active a { font-weight: 700; text-decoration: underline; color: var(--link); }
 	/* Center content */
 	.content-col { padding: 20px; min-width: 0; }
 	.content-col h1 { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 20px; font-size: 1.5em; color: var(--heading); }
@@ -246,7 +247,7 @@ window.navTree = %s;
             .on('end', function(e) { if (!e.active) sim.alphaTarget(0); e.subject.fx = null; e.subject.fy = null; }));
         node.on('click', function(e, d) { if (!d.stub && !d.current) window.location.href = d.href; });
         node.append('circle').attr('r', function(d) { return d.current ? 7 : 4 }).style('fill', function(d) { return d.stub ? '#e67e22' : (d.current ? '#2980b9' : '#3498db'); }).style('stroke', 'white').style('stroke-width', 1.5);
-        node.append('text').attr('dx', 7).attr('dy', 3).style('font-size', '9px').style('fill', '#333').text(function(d) { return d.title; });
+        node.append('text').attr('dx', 7).attr('dy', 3).style('font-size', '9px').style('fill', 'currentColor').style('opacity', '0.8').text(function(d) { return d.title; });
         console.log('graph: sim created, node count=' + nodes.length);
         console.log('graph: link selection=' + (typeof link) + ', node selection=' + (typeof node));
         console.log('graph: calling tick...');
@@ -381,7 +382,7 @@ func writeFullGraphViewer(graphDir string, graphJSON []byte) {
         .node { cursor: pointer; }
         .node circle { fill: #2980b9; stroke: white; stroke-width: 2px; }
         .node.stub circle { fill: #e67e22; stroke: #fff; }
-        .node text { font-size: 12px; fill: #333; pointer-events: none; }
+        .node text { font-size: 12px; fill: currentColor; opacity: 0.8; pointer-events: none; }
         .link { stroke: #ccc; stroke-width: 1.5px; }
         #legend { position: absolute; top: 70px; right: 20px; background: white; padding: 15px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.85em; }
         #legend h3 { margin: 0 0 10px; }
