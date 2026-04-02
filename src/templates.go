@@ -81,6 +81,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.toc-item.level-5 { padding-left: 48px; }
 	.toc-item.level-6 { padding-left: 60px; }
 	/* Theme toggle */
+	.site-name { font-size: 0.9em; font-weight: 700; color: var(--heading); margin-bottom: 12px; padding: 0 6px; }
 	.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 	.sidebar-header h2 { margin: 0; }
 	.theme-toggle { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 1.2em; line-height: 1; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; }
@@ -99,8 +100,9 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 <body>
 <div class="layout">
     <aside class="sidebar-nav">
+        <div class="site-name">Basalt</div>
         <div class="sidebar-header">
-            <h2>Nav</h2>
+            <h2>Browse</h2>
             <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">&#9788;</button>
         </div>
         <nav class="nav-tree" id="nav-tree"></nav>
