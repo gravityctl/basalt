@@ -84,12 +84,15 @@ func run() error {
 		// Read raw content for tag extraction before ProcessFile strips frontmatter
 		rawContent, _ := os.ReadFile(path)
 		tags := extractTags(rawContent)
+		date := extractDate(rawContent)
 
 		title, htmlBody, linkTargets, linkHrefs, err := parser.ProcessFile(path, relPath)
 		if err != nil {
 			fmt.Printf("Error processing %s: %v\n", path, err)
 			return nil
 		}
+
+		readingTime := computeReadingTime(htmlBody)
 
 		pageID := filepath.Join(filepath.Dir(relPath), toHTMLName(relPath))
 		outputSubdir := filepath.Join(OutputDir, filepath.Dir(relPath))
@@ -101,6 +104,8 @@ func run() error {
 		pageGraph := buildPageGraph(pageID, linkTargets, linkHrefs, backlinksMap, existingPages, pageTitles, tags)
 		pageGraph.CurrentHref = pageID + ".html"
 		pageGraph.TableOfContents = extractTOC(htmlBody)
+		pageGraph.Date = date
+		pageGraph.ReadingTime = readingTime
 
 		// Write HTML page
 		outputFile := filepath.Join(OutputDir, pageID+".html")

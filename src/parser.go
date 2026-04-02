@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -137,4 +138,44 @@ func extractTags(data []byte) []string {
 		}
 	}
 	return nil
+}
+
+// extractDate gets the date from frontmatter if present.
+func extractDate(data []byte) string {
+	re := regexp.MustCompile(`(?s)^---\s*\n(.*?)\n---\n?`)
+	if matches := re.FindSubmatch(data); len(matches) > 0 {
+		yamlContent := string(matches[1])
+		dateRe := regexp.MustCompile(`(?m)^date:\s*["']?([^"'\n]+)["']?`)
+		if m := dateRe.FindSubmatch([]byte(yamlContent)); len(m) > 0 {
+			return strings.TrimSpace(string(m[1]))
+		}
+	}
+	return ""
+}
+
+// computeReadingTime estimates reading time from word count.
+// Assumes ~200 words per minute.
+func computeReadingTime(htmlBody []byte) string {
+	words := 0
+	inTag := false
+	for _, b := range htmlBody {
+		switch b {
+		case '<':
+			inTag = true
+		case '>':
+			inTag = false
+		case ' ', '\n', '\r', '\t':
+			if !inTag {
+				words++
+			}
+		}
+	}
+	minutes := (words + 199) / 200 // ceiling division
+	if minutes < 1 {
+		minutes = 1
+	}
+	if minutes == 1 {
+		return "1 min read"
+	}
+	return fmt.Sprintf("%d min read", minutes)
 }
