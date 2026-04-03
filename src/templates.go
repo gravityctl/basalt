@@ -81,7 +81,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.toc-item.level-5 { padding-left: 48px; }
 	.toc-item.level-6 { padding-left: 60px; }
 	/* Theme toggle */
-	.site-name { font-size: 0.9em; font-weight: 700; color: var(--heading); margin-bottom: 12px; padding: 0 6px; }
+	.site-name { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 12px; font-size: 1.5em; font-weight: 700; color: var(--heading); padding-left: 6px; }
 	.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 	.sidebar-header h2 { margin: 0; }
 	.theme-toggle { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 1.2em; line-height: 1; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; }
