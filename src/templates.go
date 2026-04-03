@@ -449,8 +449,12 @@ func writeFullGraphViewer(graphDir string, graphJSON []byte) {
         .node { cursor: pointer; }
         .node circle { fill: var(--link); stroke: white; stroke-width: 2px; }
         .node.stub circle { fill: #e67e22; stroke: #fff; }
-        .node text { font-size: 12px; fill: currentColor; opacity: 0.8; pointer-events: none; }
-        .link { stroke: var(--border); stroke-width: 1.5px; }
+        .node text { font-size: 12px; fill: currentColor; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        .node.hovered text, .node.neighbor text { opacity: 1; }
+        .link { stroke: var(--border); stroke-width: 1.5px; transition: stroke-opacity 0.2s; }
+        .node.dimmed circle { opacity: 0.2; }
+        .node.dimmed text { opacity: 0; }
+        .link.dimmed { stroke-opacity: 0.1; }
         #legend { position: absolute; top: 20px; right: 20px; background: var(--card-bg); padding: 15px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); font-size: 0.85em; border: 1px solid var(--border); }
         #legend h3 { margin: 0 0 10px; color: var(--heading); }
         #legend span { display: inline-block; width: 12px; height: 12px; border-radius: 50%%; margin-right: 6px; vertical-align: middle; }
@@ -481,11 +485,36 @@ func writeFullGraphViewer(graphDir string, graphJSON []byte) {
         .force("collision", d3.forceCollide().radius(20))
         .alpha(0.3);
     var link = zoomG.selectAll("line").data(graph.edges).enter().append("line").attr("class", "link");
+    // Build neighbor set for hover highlighting (edges are still strings here)
+    var neighborOf = {};
+    graph.nodes.forEach(function(n) { neighborOf[n.id] = new Set(); });
+    graph.edges.forEach(function(e) {
+        var sid = typeof e.source === 'object' ? e.source.id : e.source;
+        var tid = typeof e.target === 'object' ? e.target.id : e.target;
+        neighborOf[sid].add(tid);
+        neighborOf[tid].add(sid);
+    });
     var node = zoomG.selectAll("g").data(graph.nodes).enter().append("g").attr("class", function(d) { return "node" + (d.stub ? " stub" : ""); })
         .call(d3.drag()
             .on("start", function(e) { if (!e.active) sim.alphaTarget(0.3).restart(); e.subject.fx = e.subject.x; e.subject.fy = e.subject.y; })
             .on("drag", function(e) { e.subject.fx = e.x; e.subject.fy = e.y; })
             .on("end", function(e) { if (!e.active) sim.alphaTarget(0); e.subject.fx = null; e.subject.fy = null; }))
+        .on("mouseover", function(event, d) {
+            var nid = d.id;
+            var neighbors = neighborOf[nid] || new Set();
+            node.classed("hovered", function(n) { return n.id === nid; });
+            node.classed("neighbor", function(n) { return n.id !== nid && neighbors.has(n.id); });
+            node.classed("dimmed", function(n) { return n.id !== nid && !neighbors.has(n.id); });
+            link.classed("dimmed", function(l) {
+                var sid = l.source.id || l.source;
+                var tid = l.target.id || l.target;
+                return sid !== nid && tid !== nid;
+            });
+        })
+        .on("mouseout", function() {
+            node.classed("hovered", false).classed("neighbor", false).classed("dimmed", false);
+            link.classed("dimmed", false);
+        })
         .on("click", function(event, d) { if (!d.stub) { sim.stop(); graph.nodes.forEach(function(n) { n.fx = n.x; n.fy = n.y; }); window.location.href = "../" + d.path; } });
     node.append("circle").attr("r", 8);
     node.append("text").attr("dx", 12).attr("dy", 4).text(function(d) { return d.title; });
