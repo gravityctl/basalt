@@ -443,15 +443,15 @@ func writeFullGraphViewer(graphDir string, graphJSON []byte) {
     <style>
         :root, [data-theme="dark"] { --bg: #1e1e1e; --text: #e0e0e0; --border: #3a3a3a; --heading: #ffffff; --card-bg: #2a2a2a; --link: #6bb3d9; }
         [data-theme="light"] { --bg: #f8f8f8; --text: #333; --border: #e1e4e8; --heading: #1a1a1a; --card-bg: #ffffff; --link: #2980b9; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
-        h1 { padding: 20px; margin: 0; font-size: 1.2em; border-bottom: 1px solid var(--border); background: var(--card-bg); color: var(--heading); }
-        #graph { width: 100vw; height: calc(100vh - 61px); }
+        html, body { overflow: hidden; height: 100%%; margin: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); }
+        #graph { width: 100vw; height: 100vh; overflow: hidden; }
         .node { cursor: pointer; }
         .node circle { fill: var(--link); stroke: white; stroke-width: 2px; }
         .node.stub circle { fill: #e67e22; stroke: #fff; }
         .node text { font-size: 12px; fill: currentColor; opacity: 0.8; pointer-events: none; }
         .link { stroke: var(--border); stroke-width: 1.5px; }
-        #legend { position: absolute; top: 70px; right: 20px; background: var(--card-bg); padding: 15px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); font-size: 0.85em; border: 1px solid var(--border); }
+        #legend { position: absolute; top: 20px; right: 20px; background: var(--card-bg); padding: 15px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); font-size: 0.85em; border: 1px solid var(--border); }
         #legend h3 { margin: 0 0 10px; color: var(--heading); }
         #legend span { display: inline-block; width: 12px; height: 12px; border-radius: 50%%; margin-right: 6px; vertical-align: middle; }
         .legend-page { background: var(--link); }
@@ -459,7 +459,6 @@ func writeFullGraphViewer(graphDir string, graphJSON []byte) {
     </style>
 </head>
 <body>
-    <h1>📊 Vault Graph View</h1>
     <div id="legend">
         <h3>Legend</h3>
         <div><span class="legend-page"></span>Page</div>
@@ -472,17 +471,16 @@ func writeFullGraphViewer(graphDir string, graphJSON []byte) {
     var w = document.getElementById("graph").clientWidth;
     var h = document.getElementById("graph").clientHeight;
     var svg = d3.select("#graph").append("svg").attr("width", w).attr("height", h);
-    // Create SVG groups BEFORE simulation starts so tick can update them
-    var linkG = svg.append("g");
-    var nodeG = svg.append("g");
+    // Zoom/pan via scroll wheel and drag on SVG background
+    var zoomG = svg.append("g");
+    svg.call(d3.zoom().scaleExtent([0.1, 4]).on("zoom", function(e) { zoomG.attr("transform", e.transform); }));
     var sim = d3.forceSimulation(graph.nodes)
         .force("link", d3.forceLink(graph.edges).id(function(d) { return d.id; }).distance(80))
         .force("charge", d3.forceManyBody().strength(-200))
         .force("center", d3.forceCenter(w / 2, h / 2))
         .force("collision", d3.forceCollide().radius(30));
-    // Render nodes/links immediately (before sim ticks)
-    var link = linkG.selectAll("line").data(graph.edges).enter().append("line").attr("class", "link");
-    var node = nodeG.selectAll("g").data(graph.nodes).enter().append("g").attr("class", function(d) { return "node" + (d.stub ? " stub" : ""); })
+    var link = zoomG.selectAll("line").data(graph.edges).enter().append("line").attr("class", "link");
+    var node = zoomG.selectAll("g").data(graph.nodes).enter().append("g").attr("class", function(d) { return "node" + (d.stub ? " stub" : ""); })
         .call(d3.drag()
             .on("start", function(e) { if (!e.active) sim.alphaTarget(0.3).restart(); e.subject.fx = e.subject.x; e.subject.fy = e.subject.y; })
             .on("drag", function(e) { e.subject.fx = e.x; e.subject.fy = e.y; })
@@ -490,7 +488,6 @@ func writeFullGraphViewer(graphDir string, graphJSON []byte) {
         .on("click", function(event, d) { if (!d.stub) window.location.href = "../" + d.path; });
     node.append("circle").attr("r", 8);
     node.append("text").attr("dx", 12).attr("dy", 4).text(function(d) { return d.title; });
-    // Update positions on every tick using saved selections
     sim.on("tick", function() {
         link.attr("x1", function(d) { return d.source.x; }).attr("y1", function(d) { return d.source.y; })
           .attr("x2", function(d) { return d.target.x; }).attr("y2", function(d) { return d.target.y; });
