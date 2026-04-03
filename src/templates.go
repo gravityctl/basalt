@@ -95,7 +95,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.site-name { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 12px; font-size: 1.5em; font-weight: 700; color: var(--heading); padding-left: 6px; }
 	.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 	.search-bar { width: 100%; background: var(--card-bg); border: 1px solid var(--border); color: var(--muted); cursor: pointer; padding: 6px 10px; border-radius: 4px; font-size: 0.85em; text-align: left; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
-	.search-bar .icon { font-size: 1.1em; }
+	.search-bar .icon { font-size: 1.5em; }
 	.search-bar:hover { border-color: var(--link); color: var(--text); }
 	.search-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: flex-start; justify-content: center; padding-top: 10vh; }
 	.search-modal { background: var(--sidebar-bg); border: 1px solid var(--border); border-radius: 8px; width: 90vw; max-width: 600px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -133,7 +133,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
             <h2>Browse</h2>
             <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">&#9788;</button>
         </div>
-        <button id="open-search" class="search-bar" type="button"><span class="icon">&#8981;</span> Search</button>
+        <button id="open-search" class="search-bar" type="button">Search <span class="icon">&#8981;</span></button>
         <nav class="nav-tree" id="nav-tree"></nav>
     </aside>
     <main class="content-col">
