@@ -95,7 +95,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.site-name { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 12px; font-size: 1.5em; font-weight: 700; color: var(--heading); padding-left: 6px; }
 	.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 	.search-bar { width: 100%; background: var(--card-bg); border: 1px solid var(--border); color: var(--muted); cursor: pointer; padding: 6px 10px; border-radius: 4px; font-size: 0.85em; text-align: left; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
-	.search-bar .icon { font-size: 1.5em; }
+	.search-bar .icon { font-size: 2em; }
 	.search-bar:hover { border-color: var(--link); color: var(--text); }
 	.search-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: flex-start; justify-content: center; padding-top: 10vh; }
 	.search-modal { background: var(--sidebar-bg); border: 1px solid var(--border); border-radius: 8px; width: 90vw; max-width: 600px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -171,30 +171,46 @@ window.navTree = %s;
         children.classList.toggle('open');
         icon.classList.toggle('open');
     }
-    window.toggleNavFolder = toggleNav;
-    function buildNavHTML(nodes) {
+    window.toggleNavFolder = function(el) {
+        var children = el.nextElementSibling;
+        var icon = el.querySelector('.icon');
+        var fid = children.id;
+        children.classList.toggle('open');
+        icon.classList.toggle('open');
+        var expanded = getExpandedFolders();
+        if (children.classList.contains('open')) {
+            if (expanded.indexOf(fid) < 0) expanded.push(fid);
+        } else {
+            expanded = expanded.filter(function(f) { return f !== fid; });
+        }
+        saveExpandedFolders(expanded);
+    };
+    function buildNavHTML(nodes, parentPath) {
         var html = '';
+        var depth = (window.pageGraphData && window.pageGraphData.currentHref) ? window.pageGraphData.currentHref.split('/').length - 1 : 0;
+        var baseDepth = depth;
+        var prefix = depth > 0 ? '../'.repeat(depth) : '';
+        var expandedFolders = getExpandedFolders();
         for (var i = 0; i < nodes.length; i++) {
             var node = nodes[i];
-            var depth = (window.pageGraphData && window.pageGraphData.currentHref) ? window.pageGraphData.currentHref.split('/').length - 1 : 0;
-            var prefix = depth > 0 ? '../'.repeat(depth) : '';
             if (node.children) {
-                var fid = 'f-' + Math.random().toString(36).slice(2);
+                var folderId = 'navf-' + (parentPath ? parentPath + '-' : '') + node.name;
+                var isOpen = expandedFolders.indexOf(folderId) >= 0;
                 var folderLabel = escHtml(node.name);
+                var iconClass = isOpen ? 'icon open' : 'icon';
+                html += '<div class="nav-folder">';
                 if (node.indexHref) {
                     var folderLink = '<a href="' + prefix + node.indexHref + '" onclick="event.stopPropagation()">' + folderLabel + '</a>';
-                    html += '<div class="nav-folder">';
                     html += '<div class="nav-folder-header" onclick="toggleNavFolder(this)">';
-                    html += '<span class="icon">&#9654;</span> ' + folderLink;
+                    html += '<span class="' + iconClass + '">&#9654;</span> ' + folderLink;
                     html += '</div>';
                 } else {
-                    html += '<div class="nav-folder">';
                     html += '<div class="nav-folder-header" onclick="toggleNavFolder(this)">';
-                    html += '<span class="icon">&#9654;</span> ' + folderLabel;
+                    html += '<span class="' + iconClass + '">&#9654;</span> ' + folderLabel;
                     html += '</div>';
                 }
-                html += '<div class="nav-folder-children" id="' + fid + '">';
-                html += buildNavHTML(node.children);
+                html += '<div class="nav-folder-children' + (isOpen ? ' open' : '') + '" id="' + folderId + '">';
+                html += buildNavHTML(node.children, folderId);
                 html += '</div></div>';
             } else {
                 var href = prefix + node.href;
@@ -205,8 +221,14 @@ window.navTree = %s;
         }
         return html;
     }
+    function getExpandedFolders() {
+        try { return JSON.parse(sessionStorage.getItem('basalt-nav-open') || []); } catch(e) { return []; }
+    }
+    function saveExpandedFolders(folders) {
+        try { sessionStorage.setItem('basalt-nav-open', JSON.stringify(folders)); } catch(e) {}
+    }
     var navEl = document.getElementById('nav-tree');
-    if (navEl) navEl.innerHTML = buildNavHTML(window.navTree || []);
+    if (navEl) navEl.innerHTML = buildNavHTML(window.navTree || [], '');
 })();
 </script>
 <script>
