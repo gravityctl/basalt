@@ -472,26 +472,29 @@ func writeFullGraphViewer(graphDir string, graphJSON []byte) {
     var w = document.getElementById("graph").clientWidth;
     var h = document.getElementById("graph").clientHeight;
     var svg = d3.select("#graph").append("svg").attr("width", w).attr("height", h);
+    // Create SVG groups BEFORE simulation starts so tick can update them
+    var linkG = svg.append("g");
+    var nodeG = svg.append("g");
     var sim = d3.forceSimulation(graph.nodes)
         .force("link", d3.forceLink(graph.edges).id(function(d) { return d.id; }).distance(80))
         .force("charge", d3.forceManyBody().strength(-200))
         .force("center", d3.forceCenter(w / 2, h / 2))
         .force("collision", d3.forceCollide().radius(30));
+    // Render nodes/links immediately (before sim ticks)
+    var link = linkG.selectAll("line").data(graph.edges).enter().append("line").attr("class", "link");
+    var node = nodeG.selectAll("g").data(graph.nodes).enter().append("g").attr("class", function(d) { return "node" + (d.stub ? " stub" : ""); })
+        .call(d3.drag()
+            .on("start", function(e) { if (!e.active) sim.alphaTarget(0.3).restart(); e.subject.fx = e.subject.x; e.subject.fy = e.subject.y; })
+            .on("drag", function(e) { e.subject.fx = e.x; e.subject.fy = e.y; })
+            .on("end", function(e) { if (!e.active) sim.alphaTarget(0); e.subject.fx = null; e.subject.fy = null; }))
+        .on("click", function(event, d) { if (!d.stub) window.location.href = "../" + d.path; });
+    node.append("circle").attr("r", 8);
+    node.append("text").attr("dx", 12).attr("dy", 4).text(function(d) { return d.title; });
+    // Update positions on every tick using saved selections
     sim.on("tick", function() {
-        svg.selectAll("line").attr("x1", function(d) { return d.source.x; }).attr("y1", function(d) { return d.source.y; })
+        link.attr("x1", function(d) { return d.source.x; }).attr("y1", function(d) { return d.source.y; })
           .attr("x2", function(d) { return d.target.x; }).attr("y2", function(d) { return d.target.y; });
-        svg.selectAll("g").attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
-    });
-    sim.on("end", function() {
-        var link = svg.append("g").selectAll("line").data(graph.edges).enter().append("line").attr("class", "link");
-        var node = svg.append("g").selectAll("g").data(graph.nodes).enter().append("g").attr("class", function(d) { return "node" + (d.stub ? " stub" : ""); })
-            .call(d3.drag()
-                .on("start", function(e) { if (!e.active) sim.alphaTarget(0.3).restart(); e.subject.fx = e.subject.x; e.subject.fy = e.subject.y; })
-                .on("drag", function(e) { e.subject.fx = e.x; e.subject.fy = e.y; })
-                .on("end", function(e) { if (!e.active) sim.alphaTarget(0); e.subject.fx = null; e.subject.fy = null; }))
-            .on("click", function(event, d) { if (!d.stub) window.location.href = "../" + d.path; });
-        node.append("circle").attr("r", 8);
-        node.append("text").attr("dx", 12).attr("dy", 4).text(function(d) { return d.title; });
+        node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
     });
     </script>
 </body>
