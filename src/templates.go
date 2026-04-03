@@ -485,7 +485,7 @@ func writeFullGraphViewer(graphDir string, graphJSON []byte) {
             .on("start", function(e) { if (!e.active) sim.alphaTarget(0.3).restart(); e.subject.fx = e.subject.x; e.subject.fy = e.subject.y; })
             .on("drag", function(e) { e.subject.fx = e.x; e.subject.fy = e.y; })
             .on("end", function(e) { if (!e.active) sim.alphaTarget(0); e.subject.fx = null; e.subject.fy = null; }))
-        .on("click", function(event, d) { if (!d.stub) { sim.stop(); window.location.href = "../" + d.path; } });
+        .on("click", function(event, d) { if (!d.stub) { sim.stop(); graph.nodes.forEach(function(n) { n.fx = n.x; n.fy = n.y; }); window.location.href = "../" + d.path; } });
     node.append("circle").attr("r", 8);
     node.append("text").attr("dx", 12).attr("dy", 4).text(function(d) { return d.title; });
     sim.on("tick", function() {
