@@ -67,6 +67,14 @@ type SearchEntry struct {
 // buildSearchIndex walks the vault and builds a search index of all pages.
 func buildSearchIndex(vaultDir string) []SearchEntry {
 	var entries []SearchEntry
+	stripTags := regexp.MustCompile(`<[^>]*>`)
+	stripMd := regexp.MustCompile(`[#*_~]`)
+	stripMdAlt := regexp.MustCompile(`!\[[^\]]*\]\([^)]*\)`)
+	stripMdHdr := regexp.MustCompile(`^#{1,6}\s+`)
+	stripMdHr := regexp.MustCompile(`^-{3,}\s*$`)
+	stripMdCode := regexp.MustCompile("`[^`]+`")
+	stripWs := regexp.MustCompile(`\s+`)
+
 	filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || !strings.HasSuffix(path, ".md") {
 			return nil
@@ -77,15 +85,16 @@ func buildSearchIndex(vaultDir string) []SearchEntry {
 		if err != nil {
 			return nil
 		}
-		// Strip frontmatter
 		data = removeFrontmatter(data)
-		// Strip markdown syntax for plain text
-		// Remove HTML tags
-		noHtml := regexp.MustCompile(`<[^>]+>`).ReplaceAll(data, []byte(" "))
-		// Remove markdown formatting
-		noMd := regexp.MustCompile(`[#*_`+"`"+`~\[\]()>|-{3,}|!\[[^\]]*\]\([^)]*\)`).ReplaceAll(noHtml, []byte(" "))
-		// Collapse whitespace
-		plain := strings.Join(strings.Fields(string(noMd)), " ")
+		text := string(data)
+		text = stripTags.ReplaceAllString(text, " ")
+		text = stripMdCode.ReplaceAllString(text, "")
+		text = stripMdHdr.ReplaceAllString(text, "")
+		text = stripMdAlt.ReplaceAllString(text, "$1")
+		text = stripMdHr.ReplaceAllString(text, " ")
+		text = stripMd.ReplaceAllString(text, "")
+		text = stripWs.ReplaceAllString(text, " ")
+		text = strings.TrimSpace(text)
 		title := extractTitle(data)
 		if title == "Untitled" {
 			title = toHTMLName(pageID)
@@ -93,7 +102,7 @@ func buildSearchIndex(vaultDir string) []SearchEntry {
 		entries = append(entries, SearchEntry{
 			Title:   title,
 			Path:    pageID + ".html",
-			Content: plain,
+			Content: text,
 		})
 		return nil
 	})

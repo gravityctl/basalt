@@ -377,7 +377,8 @@ window.navTree = %s;
         var start = Math.max(0, idx - 60);
         var end = Math.min(text.length, idx + term.length + 120);
         var snippet = (start > 0 ? '...' : '') + text.slice(start, end) + (end < text.length ? '...' : '');
-        return escHtml(snippet).replace(new RegExp(escHtml(term), 'gi'), '<mark>' + escHtml(term) + '</mark>');
+        var re = new RegExp(escHtml(term).replace(/[-\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
+        return escHtml(snippet).replace(re, function(m) { return '<mark>' + m + '</mark>'; });
     }
 
     function doSearch(term) {
