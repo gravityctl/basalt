@@ -57,6 +57,49 @@ type GraphRef struct {
 	Stub  bool   `json:"stub"`
 }
 
+// SearchEntry is a page entry in the search index
+type SearchEntry struct {
+	Title   string `json:"title"`
+	Path    string `json:"path"`
+	Content string `json:"content"` // plain text, stripped of markdown/html
+}
+
+// buildSearchIndex walks the vault and builds a search index of all pages.
+func buildSearchIndex(vaultDir string) []SearchEntry {
+	var entries []SearchEntry
+	filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || !strings.HasSuffix(path, ".md") {
+			return nil
+		}
+		relPath, _ := filepath.Rel(vaultDir, path)
+		pageID := strings.TrimSuffix(relPath, ".md")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		// Strip frontmatter
+		data = removeFrontmatter(data)
+		// Strip markdown syntax for plain text
+		// Remove HTML tags
+		noHtml := regexp.MustCompile(`<[^>]+>`).ReplaceAll(data, []byte(" "))
+		// Remove markdown formatting
+		noMd := regexp.MustCompile(`[#*_`+"`"+`~\[\]()>|-{3,}|!\[[^\]]*\]\([^)]*\)`).ReplaceAll(noHtml, []byte(" "))
+		// Collapse whitespace
+		plain := strings.Join(strings.Fields(string(noMd)), " ")
+		title := extractTitle(data)
+		if title == "Untitled" {
+			title = toHTMLName(pageID)
+		}
+		entries = append(entries, SearchEntry{
+			Title:   title,
+			Path:    pageID + ".html",
+			Content: plain,
+		})
+		return nil
+	})
+	return entries
+}
+
 // extractTOC extracts heading entries from rendered HTML for table of contents.
 // Matches headings with auto-generated IDs like <h2 id="some-heading">Text</h2>
 func extractTOC(htmlBody []byte) []TOCEntry {

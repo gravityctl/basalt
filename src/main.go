@@ -137,6 +137,14 @@ func run() error {
 		fmt.Printf("Generated %d stub pages\n", stubCount)
 	}
 
+	// Build and write search index
+	searchIndex := buildSearchIndex(SourceDir)
+	searchJSON, _ := json.MarshalIndent(searchIndex, "", "  ")
+	if err := os.WriteFile(filepath.Join(OutputDir, "search.json"), searchJSON, 0644); err != nil {
+		return fmt.Errorf("writing search.json: %w", err)
+	}
+	fmt.Printf("Search index: %d pages\n", len(searchIndex))
+
 	writeGraphViewer(graphDir, graphJSON)
 	fmt.Println("Build complete.")
 	return nil
