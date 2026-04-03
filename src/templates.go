@@ -476,7 +476,7 @@ func writeFullGraphViewer(graphDir string, graphJSON []byte) {
     svg.call(d3.zoom().scaleExtent([0.1, 4]).on("zoom", function(e) { zoomG.attr("transform", e.transform); }));
     var sim = d3.forceSimulation(graph.nodes)
         .force("link", d3.forceLink(graph.edges).id(function(d) { return d.id; }).distance(40))
-        .force("charge", d3.forceManyBody().strength(-60))
+        .force("charge", d3.forceManyBody().strength(0))
         .force("center", d3.forceCenter(w / 2, h / 2))
         .force("collision", d3.forceCollide().radius(20))
         .alpha(0.3);
