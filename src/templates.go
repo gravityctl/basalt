@@ -475,10 +475,11 @@ func writeFullGraphViewer(graphDir string, graphJSON []byte) {
     var zoomG = svg.append("g");
     svg.call(d3.zoom().scaleExtent([0.1, 4]).on("zoom", function(e) { zoomG.attr("transform", e.transform); }));
     var sim = d3.forceSimulation(graph.nodes)
-        .force("link", d3.forceLink(graph.edges).id(function(d) { return d.id; }).distance(80))
-        .force("charge", d3.forceManyBody().strength(-200))
+        .force("link", d3.forceLink(graph.edges).id(function(d) { return d.id; }).distance(40))
+        .force("charge", d3.forceManyBody().strength(-60))
         .force("center", d3.forceCenter(w / 2, h / 2))
-        .force("collision", d3.forceCollide().radius(30));
+        .force("collision", d3.forceCollide().radius(20))
+        .alpha(0.3);
     var link = zoomG.selectAll("line").data(graph.edges).enter().append("line").attr("class", "link");
     var node = zoomG.selectAll("g").data(graph.nodes).enter().append("g").attr("class", function(d) { return "node" + (d.stub ? " stub" : ""); })
         .call(d3.drag()
