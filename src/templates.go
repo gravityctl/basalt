@@ -54,7 +54,18 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.markdown-body a:hover { text-decoration: underline; }
 	/* Right sidebar */
 	.sidebar-right { background: var(--sidebar-bg); border-left: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
-	.sidebar-right h2 { margin: 0 0 12px; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+	.sidebar-right h2 { margin: 0; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+	.graph-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+	.graph-header button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.9em; padding: 0; line-height: 1; }
+	.graph-header button:hover { color: var(--text); }
+	.full-graph-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+	.full-graph-modal { background: var(--sidebar-bg); border: 1px solid var(--border); border-radius: 8px; width: 90vw; height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
+	.full-graph-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+	.full-graph-header h2 { margin: 0; font-size: 0.9em; color: var(--heading); text-transform: uppercase; letter-spacing: 0.05em; }
+	.full-graph-header button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.2em; padding: 0; line-height: 1; }
+	.full-graph-header button:hover { color: var(--text); }
+	#full-graph-container { flex: 1; overflow: hidden; }
+	#full-graph-container iframe { width: 100%; height: 100%; border: none; background: var(--bg); }
 	#local-graph { width: 100%; height: 180px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 16px; }
 	.sidebar-section { margin-bottom: 16px; }
 	.sidebar-section h3 { margin: 0 0 8px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
@@ -118,7 +129,10 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         </div>
     </main>
     <aside class="sidebar-right">
-        <h2>Graph</h2>
+        <div class="graph-header">
+            <h2>Graph</h2>
+            <button id="open-full-graph" title="Full vault graph" aria-label="Open full vault graph">⤢</button>
+        </div>
         <div id="local-graph"></div>
         %s
         %s
@@ -278,6 +292,46 @@ window.navTree = %s;
     document.head.appendChild(s);
 })();
 </script>
+<div id="full-graph-overlay" class="full-graph-overlay" style="display:none;">
+    <div class="full-graph-modal">
+        <div class="full-graph-header">
+            <h2>Full Vault Graph</h2>
+            <button id="close-full-graph" aria-label="Close">&times;</button>
+        </div>
+        <div id="full-graph-container"></div>
+    </div>
+</div>
+<script>
+// ---- Full vault graph modal ----
+(function() {
+    var overlay = document.getElementById('full-graph-overlay');
+    var container = document.getElementById('full-graph-container');
+    var openBtn = document.getElementById('open-full-graph');
+    var closeBtn = document.getElementById('close-full-graph');
+
+    openBtn.addEventListener('click', function() {
+        // Compute path to graph/index.html from current page
+        var segs = window.pageGraphData.currentHref.split('/').filter(Boolean);
+        var depth = Math.max(0, segs.length - 1);
+        var base = depth > 0 ? '../'.repeat(depth) : '';
+        var graphPath = base + 'graph/index.html';
+        container.innerHTML = '<iframe src="' + graphPath + '" style="width:100%;height:100%;border:none;"></iframe>';
+        overlay.style.display = 'flex';
+    });
+
+    closeBtn.addEventListener('click', function() {
+        overlay.style.display = 'none';
+        container.innerHTML = '';
+    });
+
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) {
+            overlay.style.display = 'none';
+            container.innerHTML = '';
+        }
+    });
+})();
+</script>
 </body>
 </html>`,
 		title, css, title,
@@ -381,25 +435,26 @@ func writeGraphViewer(graphDir string, graphJSON []byte) {
 
 func writeFullGraphViewer(graphDir string, graphJSON []byte) {
 	html := `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Graph View — Basalt</title>
     <style>
-        :root { --bg: #f8f8f8; --text: #333; }
+        :root, [data-theme="dark"] { --bg: #1e1e1e; --text: #e0e0e0; --border: #3a3a3a; --heading: #ffffff; --card-bg: #2a2a2a; --link: #6bb3d9; }
+        [data-theme="light"] { --bg: #f8f8f8; --text: #333; --border: #e1e4e8; --heading: #1a1a1a; --card-bg: #ffffff; --link: #2980b9; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
-        h1 { padding: 20px; margin: 0; font-size: 1.2em; border-bottom: 1px solid #e1e4e8; background: white; }
+        h1 { padding: 20px; margin: 0; font-size: 1.2em; border-bottom: 1px solid var(--border); background: var(--card-bg); color: var(--heading); }
         #graph { width: 100vw; height: calc(100vh - 61px); }
         .node { cursor: pointer; }
-        .node circle { fill: #2980b9; stroke: white; stroke-width: 2px; }
+        .node circle { fill: var(--link); stroke: white; stroke-width: 2px; }
         .node.stub circle { fill: #e67e22; stroke: #fff; }
         .node text { font-size: 12px; fill: currentColor; opacity: 0.8; pointer-events: none; }
-        .link { stroke: #ccc; stroke-width: 1.5px; }
-        #legend { position: absolute; top: 70px; right: 20px; background: white; padding: 15px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.85em; }
-        #legend h3 { margin: 0 0 10px; }
+        .link { stroke: var(--border); stroke-width: 1.5px; }
+        #legend { position: absolute; top: 70px; right: 20px; background: var(--card-bg); padding: 15px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); font-size: 0.85em; border: 1px solid var(--border); }
+        #legend h3 { margin: 0 0 10px; color: var(--heading); }
         #legend span { display: inline-block; width: 12px; height: 12px; border-radius: 50%%; margin-right: 6px; vertical-align: middle; }
-        .legend-page { background: #2980b9; }
+        .legend-page { background: var(--link); }
         .legend-stub { background: #e67e22; }
     </style>
 </head>
