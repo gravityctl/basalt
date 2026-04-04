@@ -118,11 +118,11 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	`
 
 	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en" data-theme="%[2]s">
+<html lang="en" data-theme="%s">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%[1]s - %[3]s</title>
+    <title>%s - %s</title>
     <style>%s</style>
 </head>
 <body>
@@ -137,7 +137,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         <nav class="nav-tree" id="nav-tree"></nav>
     </aside>
     <main class="content-col">
-        <h1>%[1]s</h1>
+        <h1>%s</h1>
         <div class="page-meta">
             <span class="page-meta-left">%s</span>
             <span class="page-meta-right">%s</span>
@@ -158,8 +158,8 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     </aside>
 </div>
 <script>
-window.basaltSiteName = "%s";
-window.basaltSiteTheme = "%s";
+window.siteName = "%s";
+window.siteTheme = "%s";
 window.pageGraphData = %s;
 window.navTree = %s;
 </script>
@@ -241,7 +241,7 @@ window.navTree = %s;
     // Apply saved preference or default to dark
     var saved = localStorage.getItem('basalt-theme');
     if (saved) { html.setAttribute('data-theme', saved); }
-    else { html.setAttribute('data-theme', window.basaltSiteTheme || 'dark'); }
+    else { html.setAttribute('data-theme', 'dark'); }
     updateIcon();
     toggle.addEventListener('click', function() {
         var current = html.getAttribute('data-theme');
@@ -477,10 +477,8 @@ window.navTree = %s;
 </script>
 </body>
 </html>`,
-		title, siteCfg.SiteTheme, siteCfg.SiteName, css,
-		siteCfg.SiteName,
-		title,
-		pageGraph.ReadingTime,
+		siteCfg.SiteTheme, title, siteCfg.SiteName, css,
+		title, pageGraph.ReadingTime,
 		pageGraph.Date,
 		htmlContent,
 		backlinksHTML,
@@ -580,11 +578,11 @@ func writeGraphViewer(graphDir string, graphJSON []byte, siteTheme string, siteN
 
 func writeFullGraphViewer(graphDir string, graphJSON []byte, siteTheme string, siteName string) {
 	html := `<!DOCTYPE html>
-<html lang="en" data-theme="%s">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Graph View — %s</title>
+    <title>Graph View — Basalt</title>
     <style>
         :root, [data-theme="dark"] { --bg: #1e1e1e; --text: #e0e0e0; --border: #3a3a3a; --heading: #ffffff; --card-bg: #2a2a2a; --link: #6bb3d9; }
         [data-theme="light"] { --bg: #f8f8f8; --text: #333; --border: #e1e4e8; --heading: #1a1a1a; --card-bg: #ffffff; --link: #2980b9; }
