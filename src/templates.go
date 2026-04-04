@@ -122,7 +122,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%[2]s - %[3]s</title>
+    <title>%[1]s - %[3]s</title>
     <style>%s</style>
 </head>
 <body>
@@ -137,7 +137,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         <nav class="nav-tree" id="nav-tree"></nav>
     </aside>
     <main class="content-col">
-        <h1>%[2]s</h1>
+        <h1>%[1]s</h1>
         <div class="page-meta">
             <span class="page-meta-left">%s</span>
             <span class="page-meta-right">%s</span>
