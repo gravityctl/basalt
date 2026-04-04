@@ -122,7 +122,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s - %s</title>
+    <title>%[2]s - %[3]s</title>
     <style>%s</style>
 </head>
 <body>
@@ -137,7 +137,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         <nav class="nav-tree" id="nav-tree"></nav>
     </aside>
     <main class="content-col">
-        <h1>%s</h1>
+        <h1>%[2]s</h1>
         <div class="page-meta">
             <span class="page-meta-left">%s</span>
             <span class="page-meta-right">%s</span>
@@ -158,8 +158,8 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     </aside>
 </div>
 <script>
-window.basaltSiteName = "%s";
-window.basaltSiteTheme = "%s";
+window.basaltSiteName = "Basalt";
+window.basaltSiteTheme = "dark";
 window.pageGraphData = %s;
 window.navTree = %s;
 </script>
@@ -477,14 +477,14 @@ window.navTree = %s;
 </script>
 </body>
 </html>`,
-		title, siteCfg.SiteTheme, siteCfg.SiteName, css, title,
+		title, siteCfg.SiteTheme, siteCfg.SiteName, css,
 		pageGraph.ReadingTime,
 		pageGraph.Date,
 		htmlContent,
 		backlinksHTML,
 		tagsHTML,
 		tocHTML,
-		string(pageGraphJSON), navTreeJSON, siteCfg.SiteName, siteCfg.SiteTheme)
+		string(pageGraphJSON), navTreeJSON, "", "")
 }
 
 // buildBacklinksHTML renders Links and Backlinks for the sidebar
