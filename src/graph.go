@@ -223,8 +223,8 @@ func buildNavTree(vaultDir string) []*NavNode {
 					// This page IS the index of cur (the parent folder)
 					// Mark the parent folder with indexHref, don't create a separate child node
 					cur.indexHref = e.pageID + ".html"
-					// Use the index page title as the folder name
-					cur.name = e.title
+					// Use the folder name (part), not the page title
+					cur.name = part
 				} else {
 					child := &tn{
 						name:      e.title,
