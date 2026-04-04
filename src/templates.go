@@ -158,8 +158,8 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     </aside>
 </div>
 <script>
-window.basaltSiteName = "Basalt";
-window.basaltSiteTheme = "dark";
+window.basaltSiteName = "%s";
+window.basaltSiteTheme = "%s";
 window.pageGraphData = %s;
 window.navTree = %s;
 </script>
@@ -478,13 +478,15 @@ window.navTree = %s;
 </body>
 </html>`,
 		title, siteCfg.SiteTheme, siteCfg.SiteName, css,
+		siteCfg.SiteName,
+		title,
 		pageGraph.ReadingTime,
 		pageGraph.Date,
 		htmlContent,
 		backlinksHTML,
 		tagsHTML,
 		tocHTML,
-		string(pageGraphJSON), navTreeJSON, "", "")
+		string(pageGraphJSON), navTreeJSON, siteCfg.SiteName, siteCfg.SiteTheme)
 }
 
 // buildBacklinksHTML renders Links and Backlinks for the sidebar
