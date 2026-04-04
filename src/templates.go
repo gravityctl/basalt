@@ -9,7 +9,7 @@ import (
 
 // generateHTMLTemplate produces the full HTML page for a rendered markdown file.
 // navTreeJSON is the hierarchical navigation tree as JSON.
-func generateHTMLTemplate(title string, htmlContent string, sourcePath string, pageGraph *PageGraph, navTreeJSON string) string {
+func generateHTMLTemplate(title string, htmlContent string, sourcePath string, pageGraph *PageGraph, navTreeJSON string, siteCfg SiteConfig) string {
 	pageGraphJSON, _ := json.Marshal(pageGraph)
 	backlinksHTML := buildBacklinksHTML(pageGraph)
 	tagsHTML := buildTagsHTML(pageGraph)
@@ -118,17 +118,17 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	`
 
 	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="%s">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s - Basalt</title>
+    <title>%s - %s</title>
     <style>%s</style>
 </head>
 <body>
 <div class="layout">
     <aside class="sidebar-nav">
-        <div class="site-name">Basalt</div>
+        <div class="site-name">%s</div>
         <div class="sidebar-header">
             <h2>Browse</h2>
             <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">&#9788;</button>
@@ -158,6 +158,8 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     </aside>
 </div>
 <script>
+window.basaltSiteName = "%s";
+window.basaltSiteTheme = "%s";
 window.pageGraphData = %s;
 window.navTree = %s;
 </script>
@@ -239,7 +241,7 @@ window.navTree = %s;
     // Apply saved preference or default to dark
     var saved = localStorage.getItem('basalt-theme');
     if (saved) { html.setAttribute('data-theme', saved); }
-    else { html.setAttribute('data-theme', 'dark'); }
+    else { html.setAttribute('data-theme', window.basaltSiteTheme || 'dark'); }
     updateIcon();
     toggle.addEventListener('click', function() {
         var current = html.getAttribute('data-theme');
@@ -475,14 +477,14 @@ window.navTree = %s;
 </script>
 </body>
 </html>`,
-		title, css, title,
+		title, siteCfg.SiteTheme, siteCfg.SiteName, css, title,
 		pageGraph.ReadingTime,
 		pageGraph.Date,
 		htmlContent,
 		backlinksHTML,
 		tagsHTML,
 		tocHTML,
-		string(pageGraphJSON), navTreeJSON)
+		string(pageGraphJSON), navTreeJSON, siteCfg.SiteName, siteCfg.SiteTheme)
 }
 
 // buildBacklinksHTML renders Links and Backlinks for the sidebar
@@ -569,18 +571,18 @@ func generateStubHTML(pageID string) string {
 }
 
 // writeGraphViewer writes the full vault D3 graph viewer.
-func writeGraphViewer(graphDir string, graphJSON []byte) {
+func writeGraphViewer(graphDir string, graphJSON []byte, siteTheme string, siteName string) {
 	downloadD3(graphDir)
-	writeFullGraphViewer(graphDir, graphJSON)
+	writeFullGraphViewer(graphDir, graphJSON, siteTheme, siteName)
 }
 
-func writeFullGraphViewer(graphDir string, graphJSON []byte) {
+func writeFullGraphViewer(graphDir string, graphJSON []byte, siteTheme string, siteName string) {
 	html := `<!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="%s">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Graph View — Basalt</title>
+    <title>Graph View — %s</title>
     <style>
         :root, [data-theme="dark"] { --bg: #1e1e1e; --text: #e0e0e0; --border: #3a3a3a; --heading: #ffffff; --card-bg: #2a2a2a; --link: #6bb3d9; }
         [data-theme="light"] { --bg: #f8f8f8; --text: #333; --border: #e1e4e8; --heading: #1a1a1a; --card-bg: #ffffff; --link: #2980b9; }
@@ -667,5 +669,5 @@ func writeFullGraphViewer(graphDir string, graphJSON []byte) {
     </script>
 </body>
 </html>`
-	os.WriteFile(filepath.Join(graphDir, "index.html"), []byte(fmt.Sprintf(html, graphJSON)), 0644)
+	os.WriteFile(filepath.Join(graphDir, "index.html"), []byte(fmt.Sprintf(html, siteTheme, siteName, graphJSON)), 0644)
 }

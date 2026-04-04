@@ -15,6 +15,50 @@ const (
 	OutputDir = "../output"
 )
 
+// SiteConfig holds site-level configuration from .env or environment variables.
+type SiteConfig struct {
+	SiteName  string // displayed in header
+	SiteTheme string // "dark" or "light"
+}
+
+// readConfig reads site configuration from .env and environment variables.
+// Environment variables (BASALT_SITE_NAME, BASALT_SITE_THEME) override .env file values.
+func readConfig() SiteConfig {
+	cfg := SiteConfig{SiteName: "Basalt", SiteTheme: "dark"}
+	for _, envPath := range []string{".env", "../.env", "../../.env"} {
+		if _, err := os.Stat(envPath); err == nil {
+			if data, err := os.ReadFile(envPath); err == nil {
+				for _, line := range strings.Split(string(data), "
+") {
+					line = strings.TrimSpace(line)
+					if line == "" || strings.HasPrefix(line, "#") {
+						continue
+					}
+					eq := strings.Index(line, "=")
+					if eq <= 0 {
+						continue
+					}
+					key := strings.TrimSpace(line[:eq])
+					val := strings.Trim(strings.TrimSpace(line[eq+1:]), ""'")
+					if key == "BASALT_SITE_NAME" {
+						cfg.SiteName = val
+					} else if key == "BASALT_SITE_THEME" && (val == "light" || val == "dark") {
+						cfg.SiteTheme = val
+					}
+				}
+			}
+			break
+		}
+	}
+	if v := os.Getenv("BASALT_SITE_NAME"); v != "" {
+		cfg.SiteName = v
+	}
+	if v := os.Getenv("BASALT_SITE_THEME"); v == "light" || v == "dark" {
+		cfg.SiteTheme = v
+	}
+	return cfg
+}
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -37,6 +81,9 @@ func run() error {
 	}
 
 	fmt.Println("Building Basalt Site...")
+
+	siteCfg := readConfig()
+	fmt.Printf("Config: site_name=%q theme=%q\n", siteCfg.SiteName, siteCfg.SiteTheme)
 
 	// Build full vault graph (computes all pages, edges, writes backlinks.json)
 	graph, _, pageTitles, err := buildGraph(SourceDir)
@@ -109,7 +156,7 @@ func run() error {
 
 		// Write HTML page
 		outputFile := filepath.Join(OutputDir, pageID+".html")
-		html := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraph, string(navTreeJSON))
+		html := generateHTMLTemplate(title, string(htmlBody), relPath, pageGraph, string(navTreeJSON), siteCfg)
 		if werr := os.WriteFile(outputFile, []byte(html), 0644); werr != nil {
 			return werr
 		}
@@ -145,7 +192,7 @@ func run() error {
 	}
 	fmt.Printf("Search index: %d pages\n", len(searchIndex))
 
-	writeGraphViewer(graphDir, graphJSON)
+	writeGraphViewer(graphDir, graphJSON, siteCfg.SiteTheme, siteCfg.SiteName)
 	fmt.Println("Build complete.")
 	return nil
 }
