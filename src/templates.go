@@ -118,17 +118,17 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	`
 
 	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en" data-theme="%[12]s">
+<html lang="en" data-theme="%[13]s">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s - %[13]s</title>
-    <style>%s</style>
+    <title>%[1]s - %[12]s</title>
+    <style>%[2]s</style>
 </head>
 <body>
 <div class="layout">
     <aside class="sidebar-nav">
-        <div class="site-name">%[13]s</div>
+        <div class="site-name">%[12]s</div>
         <div class="sidebar-header">
             <h2>Browse</h2>
             <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">&#9788;</button>
@@ -137,13 +137,13 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         <nav class="nav-tree" id="nav-tree"></nav>
     </aside>
     <main class="content-col">
-        <h1>%s</h1>
+        <h1>%[1]s</h1>
         <div class="page-meta">
-            <span class="page-meta-left">%s</span>
-            <span class="page-meta-right">%s</span>
+            <span class="page-meta-left">%[4]s</span>
+            <span class="page-meta-right">%[5]s</span>
         </div>
         <div class="markdown-body">
-            %s
+            %[6]s
         </div>
     </main>
     <aside class="sidebar-right">
@@ -152,16 +152,16 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
             <button id="open-full-graph" title="Full vault graph" aria-label="Open full vault graph">⤢</button>
         </div>
         <div id="local-graph"></div>
-        %s
-        %s
-        %s
+        %[7]s
+        %[8]s
+        %[9]s
     </aside>
 </div>
 <script>
-window.siteName = "%[13]s";
-window.siteTheme = "%[14]s";
-window.pageGraphData = %s;
-window.navTree = %s;
+window.siteName = "%[12]s";
+window.siteTheme = "%[13]s";
+window.pageGraphData = %[10]s;
+window.navTree = %[11]s;
 </script>
 <script>
 // ---- Nav: render immediately ----
@@ -485,7 +485,7 @@ window.navTree = %s;
 		tagsHTML,
 		tocHTML,
 		string(pageGraphJSON), navTreeJSON,
-		siteCfg.SiteTheme, siteCfg.SiteName, siteCfg.SiteTheme)
+		siteCfg.SiteName, siteCfg.SiteTheme)
 }
 
 // buildBacklinksHTML renders Links and Backlinks for the sidebar
@@ -560,7 +560,7 @@ func generateStubHTML(pageID string) string {
 <body>
 <div class="layout">
     <main class="content-col">
-        <h1>%s</h1>
+        <h1>%[1]s</h1>
         <div class="stub">
             <h2>📄 Page Not Found</h2>
             <p>This page doesn't exist yet. To create it, add a file named <code>%s.md</code> to your vault.</p>
