@@ -280,7 +280,7 @@ window.navTree = %[11]s;
         console.log('graph: d3 forceSimulation=' + typeof _d3.forceSimulation);
         var data = window.pageGraphData;
         var pageId = location.pathname.split('/').filter(Boolean).pop().replace('.html', '');
-        var nodes = [{ id: pageId, title: document.title.replace(' - Basalt', ''), href: location.pathname.split('/').filter(Boolean).pop(), current: true }];
+        var nodes = [{ id: pageId, title: document.title.replace(' - ' + window.siteName, ''), href: location.pathname.split('/').filter(Boolean).pop(), current: true }];
         var nodeIds = {};
         nodeIds[pageId] = true;
         data.links.forEach(function(l) { var id = l.href.replace('.html',''); if (!nodeIds[id]) { nodes.push({ id: id, title: l.title, href: l.href, stub: l.stub }); nodeIds[id] = true; } });
