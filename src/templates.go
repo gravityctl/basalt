@@ -118,7 +118,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	`
 
 	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en" data-theme="%s">
+<html lang="en" data-theme="%[2]s">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
