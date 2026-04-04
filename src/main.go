@@ -28,8 +28,7 @@ func readConfig() SiteConfig {
 	for _, envPath := range []string{".env", "../.env", "../../.env"} {
 		if _, err := os.Stat(envPath); err == nil {
 			if data, err := os.ReadFile(envPath); err == nil {
-				for _, line := range strings.Split(string(data), "
-") {
+				for _, line := range strings.Split(string(data), "\n") {
 					line = strings.TrimSpace(line)
 					if line == "" || strings.HasPrefix(line, "#") {
 						continue
@@ -39,7 +38,12 @@ func readConfig() SiteConfig {
 						continue
 					}
 					key := strings.TrimSpace(line[:eq])
-					val := strings.Trim(strings.TrimSpace(line[eq+1:]), ""'")
+					val := strings.TrimSpace(line[eq+1:])
+					if len(val) >= 2 {
+						if (val[0] == '"' && val[len(val)-1] == '"') || (val[0] == '\'' && val[len(val)-1] == '\'') {
+							val = val[1 : len(val)-1]
+						}
+					}
 					if key == "BASALT_SITE_NAME" {
 						cfg.SiteName = val
 					} else if key == "BASALT_SITE_THEME" && (val == "light" || val == "dark") {
@@ -58,7 +62,6 @@ func readConfig() SiteConfig {
 	}
 	return cfg
 }
-
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
