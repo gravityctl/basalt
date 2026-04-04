@@ -94,6 +94,23 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	/* Theme toggle */
 	.site-name { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 12px; font-size: 1.5em; font-weight: 700; color: var(--heading); padding-left: 6px; }
 	.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+	.search-bar { width: 100%; background: var(--card-bg); border: 1px solid var(--border); color: var(--muted); cursor: pointer; padding: 6px 10px; border-radius: 4px; font-size: 0.85em; text-align: left; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+	.search-bar .icon { font-size: 2em; }
+	.search-bar:hover { border-color: var(--link); color: var(--text); }
+	.search-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: flex-start; justify-content: center; padding-top: 10vh; }
+	.search-modal { background: var(--sidebar-bg); border: 1px solid var(--border); border-radius: 8px; width: 90vw; max-width: 600px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
+	.search-header { display: flex; align-items: center; border-bottom: 1px solid var(--border); padding: 12px 16px; gap: 12px; }
+	#search-input { flex: 1; background: none; border: none; color: var(--text); font-size: 1em; outline: none; }
+	#search-input::placeholder { color: var(--muted); }
+	#close-search { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.2em; padding: 0; line-height: 1; }
+	#close-search:hover { color: var(--text); }
+	#search-results { overflow-y: auto; padding: 8px; }
+	.search-result { display: block; padding: 10px 12px; border-radius: 4px; text-decoration: none; color: var(--text); }
+	.search-result:hover { background: var(--card-bg); }
+	.search-result-title { font-weight: 600; margin-bottom: 4px; color: var(--heading); }
+	.search-result-snippet { font-size: 0.8em; color: var(--muted); line-height: 1.4; }
+	.search-result-snippet mark { background: rgba(255,220,50,0.3); color: inherit; border-radius: 2px; }
+	.search-empty { padding: 20px; text-align: center; color: var(--muted); font-size: 0.9em; }
 	.sidebar-header h2 { margin: 0; }
 	.theme-toggle { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font-size: 1.2em; line-height: 1; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; }
 	.theme-toggle:hover { color: var(--text); }
@@ -116,6 +133,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
             <h2>Browse</h2>
             <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">&#9788;</button>
         </div>
+        <button id="open-search" class="search-bar" type="button">Search <span class="icon">&#8981;</span></button>
         <nav class="nav-tree" id="nav-tree"></nav>
     </aside>
     <main class="content-col">
@@ -153,30 +171,46 @@ window.navTree = %s;
         children.classList.toggle('open');
         icon.classList.toggle('open');
     }
-    window.toggleNavFolder = toggleNav;
-    function buildNavHTML(nodes) {
+    window.toggleNavFolder = function(el) {
+        var children = el.nextElementSibling;
+        var icon = el.querySelector('.icon');
+        var fid = children.id;
+        children.classList.toggle('open');
+        icon.classList.toggle('open');
+        var expanded = getExpandedFolders();
+        if (children.classList.contains('open')) {
+            if (expanded.indexOf(fid) < 0) expanded.push(fid);
+        } else {
+            expanded = expanded.filter(function(f) { return f !== fid; });
+        }
+        saveExpandedFolders(expanded);
+    };
+    function buildNavHTML(nodes, parentPath) {
         var html = '';
+        var depth = (window.pageGraphData && window.pageGraphData.currentHref) ? window.pageGraphData.currentHref.split('/').length - 1 : 0;
+        var baseDepth = depth;
+        var prefix = depth > 0 ? '../'.repeat(depth) : '';
+        var expandedFolders = getExpandedFolders();
         for (var i = 0; i < nodes.length; i++) {
             var node = nodes[i];
-            var depth = (window.pageGraphData && window.pageGraphData.currentHref) ? window.pageGraphData.currentHref.split('/').length - 1 : 0;
-            var prefix = depth > 0 ? '../'.repeat(depth) : '';
             if (node.children) {
-                var fid = 'f-' + Math.random().toString(36).slice(2);
+                var folderId = 'navf-' + (parentPath ? parentPath + '-' : '') + node.name;
+                var isOpen = expandedFolders.indexOf(folderId) >= 0;
                 var folderLabel = escHtml(node.name);
+                var iconClass = isOpen ? 'icon open' : 'icon';
+                html += '<div class="nav-folder">';
                 if (node.indexHref) {
                     var folderLink = '<a href="' + prefix + node.indexHref + '" onclick="event.stopPropagation()">' + folderLabel + '</a>';
-                    html += '<div class="nav-folder">';
                     html += '<div class="nav-folder-header" onclick="toggleNavFolder(this)">';
-                    html += '<span class="icon">&#9654;</span> ' + folderLink;
+                    html += '<span class="' + iconClass + '">&#9654;</span> ' + folderLink;
                     html += '</div>';
                 } else {
-                    html += '<div class="nav-folder">';
                     html += '<div class="nav-folder-header" onclick="toggleNavFolder(this)">';
-                    html += '<span class="icon">&#9654;</span> ' + folderLabel;
+                    html += '<span class="' + iconClass + '">&#9654;</span> ' + folderLabel;
                     html += '</div>';
                 }
-                html += '<div class="nav-folder-children" id="' + fid + '">';
-                html += buildNavHTML(node.children);
+                html += '<div class="nav-folder-children' + (isOpen ? ' open' : '') + '" id="' + folderId + '">';
+                html += buildNavHTML(node.children, folderId);
                 html += '</div></div>';
             } else {
                 var href = prefix + node.href;
@@ -187,8 +221,14 @@ window.navTree = %s;
         }
         return html;
     }
+    function getExpandedFolders() {
+        try { return JSON.parse(sessionStorage.getItem('basalt-nav-open') || []); } catch(e) { return []; }
+    }
+    function saveExpandedFolders(folders) {
+        try { sessionStorage.setItem('basalt-nav-open', JSON.stringify(folders)); } catch(e) {}
+    }
     var navEl = document.getElementById('nav-tree');
-    if (navEl) navEl.innerHTML = buildNavHTML(window.navTree || []);
+    if (navEl) navEl.innerHTML = buildNavHTML(window.navTree || [], '');
 })();
 </script>
 <script>
@@ -328,6 +368,107 @@ window.navTree = %s;
         if (e.target === overlay) {
             overlay.style.display = 'none';
             container.innerHTML = '';
+        }
+    });
+})();
+</script>
+<div id="search-overlay" class="search-overlay" style="display:none;">
+    <div class="search-modal">
+        <div class="search-header">
+            <input id="search-input" type="text" placeholder="Search pages..." autocomplete="off" />
+            <button id="close-search" aria-label="Close">&times;</button>
+        </div>
+        <div id="search-results"></div>
+    </div>
+</div>
+<script>
+// ---- Search modal ----
+(function() {
+    var overlay = document.getElementById('search-overlay');
+    var input = document.getElementById('search-input');
+    var results = document.getElementById('search-results');
+    var openBtn = document.getElementById('open-search');
+    var closeBtn = document.getElementById('close-search');
+    var searchIndex = null;
+
+    function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    function highlight(text, term) {
+        if (!term) return escHtml(text);
+        var idx = text.toLowerCase().indexOf(term.toLowerCase());
+        if (idx < 0) return escHtml(text.slice(0, 200));
+        var start = Math.max(0, idx - 60);
+        var end = Math.min(text.length, idx + term.length + 120);
+        var snippet = (start > 0 ? '...' : '') + text.slice(start, end) + (end < text.length ? '...' : '');
+        var re = new RegExp(escHtml(term).replace(/[-\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
+        return escHtml(snippet).replace(re, function(m) { return '<mark>' + m + '</mark>'; });
+    }
+
+    function doSearch(term) {
+        if (!searchIndex) return;
+        var q = term.toLowerCase();
+        var matches = [];
+        for (var i = 0; i < searchIndex.length; i++) {
+            var e = searchIndex[i];
+            var score = 0;
+            if (e.title.toLowerCase().indexOf(q) >= 0) score += 10;
+            if (e.content.toLowerCase().indexOf(q) >= 0) score += 1;
+            if (score > 0) matches.push({ entry: e, score: score });
+        }
+        matches.sort(function(a, b) { return b.score - a.score; });
+        if (matches.length === 0 || term.length === 0) {
+            results.innerHTML = '<div class="search-empty">Start typing to search...</div>';
+            return;
+        }
+        var html = '';
+        for (var j = 0; j < Math.min(matches.length, 20); j++) {
+            var m = matches[j];
+            var e = m.entry;
+            // Compute depth for relative path
+            var depth = (window.pageGraphData && window.pageGraphData.currentHref) ? window.pageGraphData.currentHref.split('/').length - 1 : 0;
+            var prefix = depth > 0 ? '../'.repeat(depth) : '';
+            html += '<a class="search-result" href="' + prefix + e.path + '">';
+            html += '<div class="search-result-title">' + escHtml(e.title) + '</div>';
+            html += '<div class="search-result-snippet">' + highlight(e.content, term) + '</div>';
+            html += '</a>';
+        }
+        results.innerHTML = html;
+    }
+
+    openBtn.addEventListener('click', function() {
+        overlay.style.display = 'flex';
+        input.focus();
+        if (!searchIndex) {
+            var depth = (window.pageGraphData && window.pageGraphData.currentHref) ? window.pageGraphData.currentHref.split('/').length - 1 : 0;
+            var prefix = depth > 0 ? '../'.repeat(depth) : '';
+            fetch(prefix + 'search.json').then(function(r) { return r.json(); }).then(function(data) {
+                searchIndex = data;
+                doSearch(input.value);
+            }).catch(function() { searchIndex = []; });
+        }
+    });
+
+    input.addEventListener('input', function() { doSearch(input.value); });
+
+    closeBtn.addEventListener('click', function() {
+        overlay.style.display = 'none';
+        input.value = '';
+        results.innerHTML = '';
+    });
+
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) {
+            overlay.style.display = 'none';
+            input.value = '';
+            results.innerHTML = '';
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && overlay.style.display === 'flex') {
+            overlay.style.display = 'none';
+            input.value = '';
+            results.innerHTML = '';
         }
     });
 })();

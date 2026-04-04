@@ -57,6 +57,58 @@ type GraphRef struct {
 	Stub  bool   `json:"stub"`
 }
 
+// SearchEntry is a page entry in the search index
+type SearchEntry struct {
+	Title   string `json:"title"`
+	Path    string `json:"path"`
+	Content string `json:"content"` // plain text, stripped of markdown/html
+}
+
+// buildSearchIndex walks the vault and builds a search index of all pages.
+func buildSearchIndex(vaultDir string) []SearchEntry {
+	var entries []SearchEntry
+	stripTags := regexp.MustCompile(`<[^>]*>`)
+	stripMd := regexp.MustCompile(`[#*_~]`)
+	stripMdAlt := regexp.MustCompile(`!\[[^\]]*\]\([^)]*\)`)
+	stripMdHdr := regexp.MustCompile(`^#{1,6}\s+`)
+	stripMdHr := regexp.MustCompile(`^-{3,}\s*$`)
+	stripMdCode := regexp.MustCompile("`[^`]+`")
+	stripWs := regexp.MustCompile(`\s+`)
+
+	filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || !strings.HasSuffix(path, ".md") {
+			return nil
+		}
+		relPath, _ := filepath.Rel(vaultDir, path)
+		pageID := strings.TrimSuffix(relPath, ".md")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		data = removeFrontmatter(data)
+		text := string(data)
+		text = stripTags.ReplaceAllString(text, " ")
+		text = stripMdCode.ReplaceAllString(text, "")
+		text = stripMdHdr.ReplaceAllString(text, "")
+		text = stripMdAlt.ReplaceAllString(text, "$1")
+		text = stripMdHr.ReplaceAllString(text, " ")
+		text = stripMd.ReplaceAllString(text, "")
+		text = stripWs.ReplaceAllString(text, " ")
+		text = strings.TrimSpace(text)
+		title := extractTitle(data)
+		if title == "Untitled" {
+			title = toHTMLName(pageID)
+		}
+		entries = append(entries, SearchEntry{
+			Title:   title,
+			Path:    pageID + ".html",
+			Content: text,
+		})
+		return nil
+	})
+	return entries
+}
+
 // extractTOC extracts heading entries from rendered HTML for table of contents.
 // Matches headings with auto-generated IDs like <h2 id="some-heading">Text</h2>
 func extractTOC(htmlBody []byte) []TOCEntry {
