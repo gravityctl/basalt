@@ -118,17 +118,17 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	`
 
 	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="en" data-theme="%s">
+<html lang="en" data-theme="%[12]s">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>%s - %s</title>
+    <title>%s - %[13]s</title>
     <style>%s</style>
 </head>
 <body>
 <div class="layout">
     <aside class="sidebar-nav">
-        <div class="site-name">%s</div>
+        <div class="site-name">%[13]s</div>
         <div class="sidebar-header">
             <h2>Browse</h2>
             <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">&#9788;</button>
@@ -158,8 +158,8 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     </aside>
 </div>
 <script>
-window.siteName = "%s";
-window.siteTheme = "%s";
+window.siteName = "%[13]s";
+window.siteTheme = "%[14]s";
 window.pageGraphData = %s;
 window.navTree = %s;
 </script>
@@ -477,14 +477,15 @@ window.navTree = %s;
 </script>
 </body>
 </html>`,
-		siteCfg.SiteTheme, title, siteCfg.SiteName, css,
-		title, pageGraph.ReadingTime,
+		title, css, title,
+		pageGraph.ReadingTime,
 		pageGraph.Date,
 		htmlContent,
 		backlinksHTML,
 		tagsHTML,
 		tocHTML,
-		string(pageGraphJSON), navTreeJSON, siteCfg.SiteName, siteCfg.SiteTheme)
+		string(pageGraphJSON), navTreeJSON,
+		siteCfg.SiteTheme, siteCfg.SiteName, siteCfg.SiteTheme)
 }
 
 // buildBacklinksHTML renders Links and Backlinks for the sidebar
@@ -578,11 +579,11 @@ func writeGraphViewer(graphDir string, graphJSON []byte, siteTheme string, siteN
 
 func writeFullGraphViewer(graphDir string, graphJSON []byte, siteTheme string, siteName string) {
 	html := `<!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="%s">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Graph View — Basalt</title>
+    <title>Graph View — %s</title>
     <style>
         :root, [data-theme="dark"] { --bg: #1e1e1e; --text: #e0e0e0; --border: #3a3a3a; --heading: #ffffff; --card-bg: #2a2a2a; --link: #6bb3d9; }
         [data-theme="light"] { --bg: #f8f8f8; --text: #333; --border: #e1e4e8; --heading: #1a1a1a; --card-bg: #ffffff; --link: #2980b9; }
