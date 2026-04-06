@@ -1,0 +1,120 @@
+name: Build and Deploy Basalt Site
+
+on:
+  workflow_dispatch:
+    inputs:
+      vault_repo:
+        description: "Vault repository (owner/repo)"
+        required: true
+        type: string
+      vault_directory:
+        description: "Directory within vault repo containing markdown files (e.g. vault/)"
+        required: true
+        default: "vault/"
+        type: string
+      output_directory:
+        description: "Directory to commit built output to in vault repo (e.g. output/)"
+        required: true
+        default: "output/"
+        type: string
+      build_branch:
+        description: "Branch name to commit built output to"
+        required: false
+        default: "basalt"
+        type: string
+
+  workflow_call:
+    inputs:
+      vault_repo:
+        description: "Vault repository (owner/repo)"
+        required: true
+        type: string
+      vault_directory:
+        description: "Directory within vault repo containing markdown files"
+        required: true
+        type: string
+      output_directory:
+        description: "Directory to commit built output to"
+        required: true
+        type: string
+      build_branch:
+        description: "Branch name to commit built output to"
+        required: false
+        type: string
+        default: "basalt"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout basalt repo (source only)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.BASALT_REPO || 'gravityctl/basalt' }}
+          path: basalt
+          sparse-checkout: |
+            src/
+            go.mod
+            go.sum
+            .env.example
+          sparse-checkout-cone-mode: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+          cache-dependency-path: basalt/go.sum
+
+      - name: Build basalt binary
+        run: |
+          cd basalt/src
+          CGO_ENABLED=0 go build -buildvcs=false -o basalt .
+
+      - name: Checkout vault repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.vault_repo }}
+          path: workspace
+          ref: main
+          sparse-checkout: |
+            ${{ inputs.vault_directory }}
+          sparse-checkout-cone-mode: false
+
+      - name: Prepare vault layout for basalt
+        run: |
+          # basalt expects ../vault relative to where it's run
+          cp -r "workspace/${{ inputs.vault_directory }}" basalt/vault
+
+      - name: Build site
+        run: |
+          cd basalt
+          ./src/basalt
+        env:
+          BASALT_SITE_NAME: ${{ vars.BASALT_SITE_NAME }}
+          BASALT_SITE_THEME: ${{ vars.BASALT_SITE_THEME }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: basalt/output
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Commit output to vault repo
+        if: inputs.vault_repo != ''
+        run: |
+          cd basalt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b ${{ inputs.build_branch }}
+          git add output/
+          git commit -m "chore: publish basalt site output [skip ci]" || true
+          git push -f origin ${{ inputs.build_branch }}
