@@ -46,6 +46,8 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
     permissions:
       contents: write
       pages: write
@@ -88,7 +90,6 @@ jobs:
 
       - name: Prepare vault layout for basalt
         run: |
-          # basalt expects ../vault relative to where it's run
           cp -r "workspace/${{ inputs.vault_directory }}" basalt/vault
 
       - name: Build site
