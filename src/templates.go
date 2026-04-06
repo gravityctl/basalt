@@ -28,7 +28,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.mobile-nav-toggle:hover { background: var(--card-bg); }
 	@media (max-width: 768px) {
 		.mobile-nav-toggle { display: block; }
-		.layout { grid-template-columns: 1fr; }
+		.layout { grid-template-columns: 1fr; grid-template-rows: auto auto; }
 		.sidebar-nav {
 			position: fixed; top: 0; left: 0; height: 100vh; width: 280px; z-index: 1000;
 			transform: translateX(-100%); transition: transform 0.25s ease;
@@ -36,9 +36,9 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 		}
 		.sidebar-nav.open { transform: translateX(0); }
 		.sidebar-nav.closed { transform: translateX(-100%); }
-		.content-col { padding-top: 60px; }
-		.sidebar-right { display: none; }
-		.content-col { grid-column: 1; }
+		.content-col { grid-row: 1; padding-top: 60px; }
+		.sidebar-right { grid-row: 2; display: block; border-left: none; border-top: 1px solid var(--border); height: auto; position: static; }
+		.sidebar-right .sidebar-section { margin-bottom: 8px; }
 	}
 	/* Left sidebar — nav */
 	.sidebar-nav { background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
