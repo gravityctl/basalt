@@ -29,6 +29,8 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	@media (max-width: 768px) {
 		.mobile-nav-toggle { display: block; }
 		.layout { grid-template-columns: 1fr; grid-template-rows: auto auto; }
+		.mobile-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--sidebar-bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 999; }
+		.mobile-header .mobile-site-name { flex: 1; font-size: 1em; font-weight: 600; color: var(--heading); margin: 0; padding: 0; border: none; }
 		.sidebar-nav {
 			position: fixed; top: 0; left: 0; height: 100vh; width: 280px; z-index: 1000;
 			transform: translateX(-100%); transition: transform 0.25s ease;
@@ -36,8 +38,8 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 		}
 		.sidebar-nav.open { transform: translateX(0); }
 		.sidebar-nav.closed { transform: translateX(-100%); }
-		.content-col { grid-row: 1; padding-top: 60px; }
-		.sidebar-right { grid-row: 2; display: block; border-left: none; border-top: 1px solid var(--border); height: auto; position: static; }
+		.content-col { grid-row: 2; padding: 16px 20px; }
+		.sidebar-right { grid-row: 3; display: block; border-left: none; border-top: 1px solid var(--border); height: auto; position: static; }
 		.sidebar-right .sidebar-section { margin-bottom: 8px; }
 	}
 	/* Left sidebar — nav */
@@ -147,8 +149,11 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     <style>%[2]s</style>
 </head>
 <body>
-<button id="mobile-nav-toggle" class="mobile-nav-toggle" aria-label="Toggle navigation">☰</button>
 <div class="layout">
+    <div class="mobile-header">
+        <button id="mobile-nav-toggle" class="mobile-nav-toggle" aria-label="Toggle navigation">☰</button>
+        <span class="mobile-site-name">%[12]s</span>
+    </div>
     <aside class="sidebar-nav">
         <div class="site-name">%[12]s</div>
         <div class="sidebar-header">
