@@ -23,6 +23,23 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	* { box-sizing: border-box; }
 	body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; margin: 0; background: var(--bg); color: var(--text); display: flex; min-height: 100vh; }
 	.layout { display: grid; grid-template-columns: 1fr 2fr 1fr; width: 100%; max-width: 100vw; align-items: start; }
+	/* Mobile nav toggle */
+	.mobile-nav-toggle { display: none; position: fixed; top: 12px; left: 12px; z-index: 1001; background: var(--sidebar-bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 12px; font-size: 1.2em; cursor: pointer; }
+	.mobile-nav-toggle:hover { background: var(--card-bg); }
+	@media (max-width: 768px) {
+		.mobile-nav-toggle { display: block; }
+		.layout { grid-template-columns: 1fr; }
+		.sidebar-nav {
+			position: fixed; top: 0; left: 0; height: 100vh; width: 280px; z-index: 1000;
+			transform: translateX(-100%); transition: transform 0.25s ease;
+			box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+		}
+		.sidebar-nav.open { transform: translateX(0); }
+		.sidebar-nav.closed { transform: translateX(-100%); }
+		.content-col { padding-top: 60px; }
+		.sidebar-right { display: none; }
+		.content-col { grid-column: 1; }
+	}
 	/* Left sidebar — nav */
 	.sidebar-nav { background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 	.sidebar-nav h2 { margin: 0 0 12px; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
@@ -58,6 +75,10 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.graph-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 	.graph-header button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.9em; padding: 0; line-height: 1; }
 	.graph-header button:hover { color: var(--text); }
+	.close-nav { display: none; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1em; padding: 0; }
+	@media (max-width: 768px) {
+		.close-nav { display: block; }
+	}
 	.full-graph-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center; }
 	.full-graph-modal { background: var(--sidebar-bg); border: 1px solid var(--border); border-radius: 8px; width: 90vw; height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
 	.full-graph-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
@@ -126,10 +147,12 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     <style>%[2]s</style>
 </head>
 <body>
+<button id="mobile-nav-toggle" class="mobile-nav-toggle" aria-label="Toggle navigation">☰</button>
 <div class="layout">
     <aside class="sidebar-nav">
         <div class="site-name">%[12]s</div>
         <div class="sidebar-header">
+            <button id="close-nav" class="close-nav" aria-label="Close navigation">✕</button>
             <h2>Browse</h2>
             <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">&#9788;</button>
         </div>
@@ -159,6 +182,16 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 </div>
 <script>
 window.siteName = "%[12]s";
+    // Mobile nav toggle
+    var navToggle = document.getElementById('mobile-nav-toggle');
+    var closeNav = document.getElementById('close-nav');
+    var sidebarNav = document.querySelector('.sidebar-nav');
+    if (navToggle) {
+        navToggle.addEventListener('click', function() { sidebarNav.classList.toggle('open'); sidebarNav.classList.remove('closed'); });
+    }
+    if (closeNav) {
+        closeNav.addEventListener('click', function() { sidebarNav.classList.remove('open'); sidebarNav.classList.add('closed'); });
+    }
 window.siteTheme = "%[13]s";
 window.pageGraphData = %[10]s;
 window.navTree = %[11]s;
@@ -558,6 +591,7 @@ func generateStubHTML(pageID string) string {
     </style>
 </head>
 <body>
+<button id="mobile-nav-toggle" class="mobile-nav-toggle" aria-label="Toggle navigation">☰</button>
 <div class="layout">
     <main class="content-col">
         <h1>%[1]s</h1>
