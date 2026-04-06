@@ -9,11 +9,26 @@ import (
 	"strings"
 )
 
-// Config — adjust these to match your vault layout
-const (
-	SourceDir = "../vault"
-	OutputDir = "../output"
+// Config — adjust these to match your vault layout.
+// BASALT_INPUT and BASALT_OUTPUT override these defaults.
+var (
+	SourceDir = getSourceDir()
+	OutputDir = getOutputDir()
 )
+
+func getSourceDir() string {
+	if v := os.Getenv("BASALT_INPUT"); v != "" {
+		return v
+	}
+	return "../vault"
+}
+
+func getOutputDir() string {
+	if v := os.Getenv("BASALT_OUTPUT"); v != "" {
+		return v
+	}
+	return "../output"
+}
 
 // SiteConfig holds site-level configuration from .env or environment variables.
 type SiteConfig struct {
