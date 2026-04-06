@@ -98,6 +98,8 @@ jobs:
         env:
           BASALT_SITE_NAME: ${{ vars.BASALT_SITE_NAME }}
           BASALT_SITE_THEME: ${{ vars.BASALT_SITE_THEME }}
+          BASALT_INPUT: vault
+          BASALT_OUTPUT: output
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
