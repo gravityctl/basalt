@@ -76,7 +76,7 @@ func buildSearchIndex(vaultDir string) []SearchEntry {
 	stripWs := regexp.MustCompile(`\s+`)
 
 	filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || !strings.HasSuffix(path, ".md") {
+		if err != nil || !strings.HasSuffix(path, ".md") || isIgnored(path) {
 			return nil
 		}
 		relPath, _ := filepath.Rel(vaultDir, path)
@@ -186,7 +186,7 @@ func buildNavTree(vaultDir string) []*NavNode {
 	entries := []entry{}
 
 	filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || !strings.HasSuffix(path, ".md") {
+		if err != nil || !strings.HasSuffix(path, ".md") || isIgnored(path) {
 			return nil
 		}
 		rel, _ := filepath.Rel(vaultDir, path)
@@ -287,7 +287,7 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, map[string]string
 	pageTitles := make(map[string]string)
 
 	err := filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || !strings.HasSuffix(path, ".md") {
+		if err != nil || !strings.HasSuffix(path, ".md") || isIgnored(path) {
 			return nil
 		}
 		rel, _ := filepath.Rel(vaultDir, path)
@@ -303,7 +303,7 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, map[string]string
 	}
 
 	err = filepath.Walk(vaultDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || !strings.HasSuffix(path, ".md") {
+		if err != nil || !strings.HasSuffix(path, ".md") || isIgnored(path) {
 			return nil
 		}
 		rel, _ := filepath.Rel(vaultDir, path)

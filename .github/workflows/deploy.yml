@@ -27,6 +27,11 @@ on:
         required: false
         default: "dark"
         type: string
+      ignored_dirs:
+        description: "Comma-separated list of directory names to ignore"
+        required: false
+        default: ""
+        type: string
 
   workflow_call:
     inputs:
@@ -51,6 +56,11 @@ on:
         description: "Default theme: dark or light"
         required: false
         default: "dark"
+        type: string
+      ignored_dirs:
+        description: "Comma-separated list of directory names to ignore"
+        required: false
+        default: ""
         type: string
 
 jobs:
@@ -109,6 +119,7 @@ jobs:
         env:
           BASALT_SITE_NAME: ${{ inputs.site_name }}
           BASALT_SITE_THEME: ${{ inputs.site_theme }}
+          BASALT_IGNORED_DIRS: ${{ inputs.ignored_dirs }}
           BASALT_INPUT: vault
           BASALT_OUTPUT: output
 

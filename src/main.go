@@ -30,10 +30,26 @@ func getOutputDir() string {
 	return "../output"
 }
 
+// ignoredDirs holds directory names to skip during vault walks
+var ignoredDirs []string
+
+func isIgnored(path string) bool {
+	parts := strings.Split(filepath.ToSlash(path), "/")
+	for _, part := range parts {
+		for _, ign := range ignoredDirs {
+			if part == ign {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // SiteConfig holds site-level configuration from .env or environment variables.
 type SiteConfig struct {
-	SiteName  string // displayed in header
-	SiteTheme string // "dark" or "light"
+	SiteName    string   // displayed in header
+	SiteTheme   string   // "dark" or "light"
+	IgnoredDirs []string // directory names to skip during vault walk
 }
 
 // readConfig reads site configuration from .env and environment variables.
@@ -75,6 +91,15 @@ func readConfig() SiteConfig {
 	if v := os.Getenv("BASALT_SITE_THEME"); v == "light" || v == "dark" {
 		cfg.SiteTheme = v
 	}
+	// Parse ignored directories (comma-separated)
+	if v := os.Getenv("BASALT_IGNORED_DIRS"); v != "" {
+		for _, part := range strings.Split(v, ",") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				cfg.IgnoredDirs = append(cfg.IgnoredDirs, part)
+			}
+		}
+	}
 	return cfg
 }
 func main() {
@@ -102,6 +127,7 @@ func run() error {
 
 	siteCfg := readConfig()
 	fmt.Printf("Config: site_name=%q theme=%q\n", siteCfg.SiteName, siteCfg.SiteTheme)
+	ignoredDirs = siteCfg.IgnoredDirs
 
 	// Build full vault graph (computes all pages, edges, writes backlinks.json)
 	graph, _, pageTitles, err := buildGraph(SourceDir)
@@ -140,7 +166,7 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		if !strings.HasSuffix(path, ".md") {
+		if !strings.HasSuffix(path, ".md") || isIgnored(path) {
 			return nil
 		}
 
