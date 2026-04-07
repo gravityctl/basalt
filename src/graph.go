@@ -330,7 +330,7 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, map[string]string
 		added[id] = true
 	}
 	for _, e := range g.Edges {
-		if !added[e.Target] {
+		if !added[e.Target] && strings.HasSuffix(e.Target, ".md") {
 			g.Nodes = append(g.Nodes, GraphNode{
 				ID: e.Target, Title: toHTMLName(e.Target), Path: e.Target + ".html", Stub: true,
 			})
