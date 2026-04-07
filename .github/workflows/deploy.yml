@@ -17,11 +17,6 @@ on:
         required: true
         default: "output/"
         type: string
-      build_branch:
-        description: "Branch name to commit built output to"
-        required: false
-        default: "basalt"
-        type: string
 
   workflow_call:
     inputs:
@@ -37,11 +32,6 @@ on:
         description: "Directory to commit built output to"
         required: true
         type: string
-      build_branch:
-        description: "Branch name to commit built output to"
-        required: false
-        type: string
-        default: "basalt"
 
 jobs:
   build-and-deploy:
@@ -111,13 +101,3 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: Commit output to vault repo
-        if: inputs.vault_repo != ''
-        run: |
-          cd basalt
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b ${{ inputs.build_branch }}
-          git add output/
-          git commit -m "chore: publish basalt site output [skip ci]" || true
-          git push -f origin ${{ inputs.build_branch }}
