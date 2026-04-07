@@ -17,6 +17,16 @@ on:
         required: true
         default: "output/"
         type: string
+      site_name:
+        description: "Site name shown in header and titles"
+        required: false
+        default: "Basalt"
+        type: string
+      site_theme:
+        description: "Default theme: dark or light"
+        required: false
+        default: "dark"
+        type: string
 
   workflow_call:
     inputs:
@@ -31,6 +41,16 @@ on:
       output_directory:
         description: "Directory to commit built output to"
         required: true
+        type: string
+      site_name:
+        description: "Site name shown in header and titles"
+        required: false
+        default: "Basalt"
+        type: string
+      site_theme:
+        description: "Default theme: dark or light"
+        required: false
+        default: "dark"
         type: string
 
 jobs:
@@ -87,8 +107,8 @@ jobs:
           cd basalt
           ./src/basalt
         env:
-          BASALT_SITE_NAME: ${{ vars.BASALT_SITE_NAME }}
-          BASALT_SITE_THEME: ${{ vars.BASALT_SITE_THEME }}
+          BASALT_SITE_NAME: ${{ inputs.site_name }}
+          BASALT_SITE_THEME: ${{ inputs.site_theme }}
           BASALT_INPUT: vault
           BASALT_OUTPUT: output
 
@@ -100,4 +120,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
