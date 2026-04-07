@@ -71,6 +71,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.markdown-body h3 { color: var(--heading); }
 	.markdown-body a { color: var(--link); text-decoration: none; font-weight: 500; }
 	.markdown-body a:hover { text-decoration: underline; }
+	.markdown-body img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
 	/* Right sidebar */
 	.sidebar-right { background: var(--sidebar-bg); border-left: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 	.sidebar-right h2 { margin: 0; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
