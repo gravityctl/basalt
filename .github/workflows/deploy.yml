@@ -104,7 +104,7 @@ jobs:
       - name: Checkout vault repo
         uses: actions/checkout@v4
         with:
-          repository: ${{ inputs.vault_repo | 'gravityctl/basalt' }}
+          repository: ${{ inputs.vault_repo || 'gravityctl/basalt' }}
           path: workspace
           ref: main
           sparse-checkout: |
@@ -113,16 +113,16 @@ jobs:
 
       - name: Prepare vault layout for basalt
         run: |
-          cp -r "workspace/${{ inputs.vault_directory | 'vault'}}" basalt/vault
+          cp -r "workspace/${{ inputs.vault_directory || 'vault'}}" basalt/vault
 
       - name: Build site
         run: |
           cd basalt
           ./src/basalt
         env:
-          BASALT_SITE_NAME: ${{ inputs.site_name | "Basalt" }}
-          BASALT_SITE_THEME: ${{ inputs.site_theme | "dark" }}
-          BASALT_IGNORED_DIRS: ${{ inputs.ignored_dirs | "" }}
+          BASALT_SITE_NAME: ${{ inputs.site_name || "Basalt" }}
+          BASALT_SITE_THEME: ${{ inputs.site_theme || "dark" }}
+          BASALT_IGNORED_DIRS: ${{ inputs.ignored_dirs || "" }}
           BASALT_INPUT: vault
           BASALT_OUTPUT: output
 
