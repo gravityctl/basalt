@@ -42,6 +42,8 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 		.content-col { padding: 16px 20px; }
 		.sidebar-right { display: none; }
 		.sidebar-right .sidebar-section { margin-bottom: 8px; }
+		.sidebar-backdrop { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 999; }
+		.sidebar-nav.open ~ .sidebar-backdrop { display: block; }
 	}
 	/* Left sidebar — nav */
 	.sidebar-nav { background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
@@ -159,13 +161,13 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     <aside class="sidebar-nav">
         <div class="site-name">%[12]s</div>
         <div class="sidebar-header">
-            <button id="close-nav" class="close-nav" aria-label="Close navigation">✕</button>
             <h2>Browse</h2>
             <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">&#9788;</button>
         </div>
         <button id="open-search" class="search-bar" type="button">Search <span class="icon">&#8981;</span></button>
         <nav class="nav-tree" id="nav-tree"></nav>
     </aside>
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
     <main class="content-col">
         <h1>%[1]s</h1>
         <div class="page-meta">
@@ -191,13 +193,24 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 window.siteName = "%[12]s";
     // Mobile nav toggle
     var navToggle = document.getElementById('mobile-nav-toggle');
-    var closeNav = document.getElementById('close-nav');
     var sidebarNav = document.querySelector('.sidebar-nav');
+    var sidebarBackdrop = document.getElementById('sidebar-backdrop');
     if (navToggle) {
-        navToggle.addEventListener('click', function() { sidebarNav.classList.toggle('open'); sidebarNav.classList.remove('closed'); });
+        navToggle.addEventListener('click', function() {
+            if (sidebarNav.classList.contains('open')) {
+                sidebarNav.classList.remove('open');
+                sidebarNav.classList.add('closed');
+            } else {
+                sidebarNav.classList.remove('closed');
+                sidebarNav.classList.add('open');
+            }
+        });
     }
-    if (closeNav) {
-        closeNav.addEventListener('click', function() { sidebarNav.classList.remove('open'); sidebarNav.classList.add('closed'); });
+    if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener('click', function() {
+            sidebarNav.classList.remove('open');
+            sidebarNav.classList.add('closed');
+        });
     }
 window.siteTheme = "%[13]s";
 window.pageGraphData = %[10]s;
