@@ -253,8 +253,18 @@ func buildPageGraph(pageID string, linkTargets []string, linkHrefs []string, bac
 		if i < len(linkHrefs) {
 			href = linkHrefs[i] + ".html"
 		}
+		title := toHTMLName(target)
+		if t, ok := pageTitles[target]; ok && t != "" {
+			title = t
+		}
+		if title == "index" {
+			parts := strings.Split(target, "/")
+			if len(parts) > 1 {
+				title = parts[len(parts)-2]
+			}
+		}
 		pg.Links = append(pg.Links, GraphRef{
-			Title: toHTMLName(target),
+			Title: title,
 			Href:  href,
 			Stub:  !existingPages[target],
 		})
@@ -265,6 +275,13 @@ func buildPageGraph(pageID string, linkTargets []string, linkHrefs []string, bac
 		title := toHTMLName(source)
 		if t, ok := pageTitles[source]; ok && t != "" {
 			title = t
+		}
+		// If source is an index page, use folder name
+		if title == "index" {
+			parts := strings.Split(source, "/")
+			if len(parts) > 1 {
+				title = parts[len(parts)-2]
+			}
 		}
 		pg.Backlinks = append(pg.Backlinks, GraphRef{
 			Title: title,
