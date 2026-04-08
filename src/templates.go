@@ -30,7 +30,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 		.mobile-nav-toggle { display: block; background: var(--sidebar-bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 12px; font-size: 1.2em; cursor: pointer; }
 		.mobile-header { position: fixed; top: 0; left: 0; right: 0; z-index: 998; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--sidebar-bg); border-bottom: 1px solid var(--border); }
 		.mobile-header .mobile-site-name { flex: 1; font-size: 1em; font-weight: 600; color: var(--heading); margin: 0; padding: 0; border: none; }
-		.layout { display: flex; flex-direction: column; }
+		.layout { display: block; }
 		.sidebar-nav {
 			display: none;
 			position: fixed; top: 0; left: 0; right: 0; height: 100vh; width: 100vw; z-index: 1000;
