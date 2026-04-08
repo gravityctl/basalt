@@ -28,7 +28,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.mobile-header { display: none; }
 	@media (max-width: 768px) {
 		.mobile-nav-toggle { display: block; background: var(--sidebar-bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 12px; font-size: 1.2em; cursor: pointer; }
-		.mobile-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--sidebar-bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 999; grid-row: 1; }
+		.mobile-header { position: fixed; top: 0; left: 0; right: 0; z-index: 998; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--sidebar-bg); border-bottom: 1px solid var(--border); }
 		.mobile-header .mobile-site-name { flex: 1; font-size: 1em; font-weight: 600; color: var(--heading); margin: 0; padding: 0; border: none; }
 		.layout { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
 		.sidebar-nav {
@@ -38,7 +38,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 		}
 		.sidebar-nav.open { transform: translateX(0); }
 		.sidebar-nav.closed { transform: translateX(-100%); }
-		.content-col { grid-row: 3; padding: 16px 20px; }
+		.content-col { grid-row: 2; padding: 16px 20px; }
 		.sidebar-right { display: block; border-left: none; border-top: 1px solid var(--border); height: auto; position: static; }
 		.sidebar-right .sidebar-section { margin-bottom: 8px; }
 	}
