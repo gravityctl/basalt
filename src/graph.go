@@ -314,6 +314,12 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, map[string]string
 		}
 		_, targets, _ := extractWikiLinks(data, rel)
 		for _, tgt := range targets {
+			// Skip wiki links to non-markdown files (e.g. [[diagram.drawio]])
+			// The target is a path without extension — check if .md version exists in vault
+			mdPath := filepath.Join(vaultDir, tgt+".md")
+			if _, err := os.Stat(mdPath); os.IsNotExist(err) {
+				continue
+			}
 			g.Edges = append(g.Edges, GraphEdge{Source: srcID, Target: tgt})
 		}
 		return nil
@@ -325,16 +331,13 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, map[string]string
 	added := make(map[string]bool)
 	for id := range allPages {
 		title := pageTitles[id]
-		// If page is an index page, use the folder name but preserve title case from frontmatter
+		// If page is an index page, use folder name only if frontmatter has no meaningful title
 		if toHTMLName(id) == "index" {
 			parts := strings.Split(id, "/")
 			if len(parts) > 1 {
-				parentFolder := parts[len(parts)-2]
-				// Use the existing frontmatter title if available, otherwise use folder name
+				// Only use folder name if title is empty or equals "index"
 				if title == "" || title == "index" {
-					title = parentFolder
-				} else {
-					title = title // keep frontmatter title as-is
+					title = parts[len(parts)-2]
 				}
 			}
 		}
