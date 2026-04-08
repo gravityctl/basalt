@@ -33,9 +33,9 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 		.layout { display: flex; flex-direction: column; }
 		.sidebar-nav {
 			display: none;
-			position: fixed; top: 0; left: 0; height: 100vh; width: 280px; z-index: 1000;
+			position: fixed; top: 0; left: 0; right: 0; height: 100vh; width: 100vw; z-index: 1000;
 			transform: translateX(-100%); transition: transform 0.25s ease;
-			box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+			box-shadow: none;
 		}
 		.sidebar-nav.open { display: block; transform: translateX(0); }
 		.sidebar-nav.closed { display: block; transform: translateX(-100%); }
