@@ -38,7 +38,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 		}
 		.sidebar-nav.open { transform: translateX(0); }
 		.sidebar-nav.closed { transform: translateX(-100%); }
-		.content-col { padding: 16px 20px; }
+		.content-col { padding: 16px 20px; align-self: start; }
 		.sidebar-right { display: block; border-left: none; border-top: 1px solid var(--border); position: static; margin-top: 0; }
 		.sidebar-right .sidebar-section { margin-bottom: 8px; }
 	}
