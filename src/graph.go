@@ -314,6 +314,12 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, map[string]string
 		}
 		_, targets, _ := extractWikiLinks(data, rel)
 		for _, tgt := range targets {
+			// Skip wiki links to non-markdown files (e.g. [[diagram.drawio]])
+			// The target is a path without extension — check if .md version exists in vault
+			mdPath := filepath.Join(vaultDir, tgt+".md")
+			if _, err := os.Stat(mdPath); os.IsNotExist(err) {
+				continue
+			}
 			g.Edges = append(g.Edges, GraphEdge{Source: srcID, Target: tgt})
 		}
 		return nil
@@ -324,15 +330,34 @@ func buildGraph(vaultDir string) (*Graph, map[string][]string, map[string]string
 
 	added := make(map[string]bool)
 	for id := range allPages {
+		title := pageTitles[id]
+		// If page is an index page, use folder name only if frontmatter has no meaningful title
+		if toHTMLName(id) == "index" {
+			parts := strings.Split(id, "/")
+			if len(parts) > 1 {
+				// Only use folder name if title is empty or equals "index"
+				if title == "" || title == "index" {
+					title = parts[len(parts)-2]
+				}
+			}
+		}
 		g.Nodes = append(g.Nodes, GraphNode{
-			ID: id, Title: pageTitles[id], Path: id + ".html", Stub: false,
+			ID: id, Title: title, Path: id + ".html", Stub: false,
 		})
 		added[id] = true
 	}
 	for _, e := range g.Edges {
 		if !added[e.Target] && strings.HasSuffix(e.Target, ".md") {
+			title := toHTMLName(e.Target)
+			// If stub is an index page, use the folder name but preserve title case
+			if title == "index" {
+				parts := strings.Split(e.Target, "/")
+				if len(parts) > 1 {
+					title = parts[len(parts)-2]
+				}
+			}
 			g.Nodes = append(g.Nodes, GraphNode{
-				ID: e.Target, Title: toHTMLName(e.Target), Path: e.Target + ".html", Stub: true,
+				ID: e.Target, Title: title, Path: e.Target + ".html", Stub: true,
 			})
 			added[e.Target] = true
 		}
