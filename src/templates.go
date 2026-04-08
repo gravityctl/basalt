@@ -14,6 +14,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	backlinksHTML := buildBacklinksHTML(pageGraph)
 	tagsHTML := buildTagsHTML(pageGraph)
 	tocHTML := buildTocHTML(pageGraph)
+	siteNameJS, _ := json.Marshal(siteCfg.SiteName)
 
 	css := `
 	/* Dark mode (default) */
@@ -187,7 +188,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     </aside>
 </div>
 <script>
-window.siteName = "%[12]s";
+window.siteName = %[14]s;
     // Mobile nav toggle
     var navToggle = document.getElementById('mobile-nav-toggle');
     var closeNav = document.getElementById('close-nav');
@@ -524,7 +525,7 @@ window.navTree = %[11]s;
 		tagsHTML,
 		tocHTML,
 		string(pageGraphJSON), navTreeJSON,
-		siteCfg.SiteName, siteCfg.SiteTheme)
+		siteCfg.SiteName, siteCfg.SiteTheme, string(siteNameJS))
 }
 
 // buildBacklinksHTML renders Links and Backlinks for the sidebar
