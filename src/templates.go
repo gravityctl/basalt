@@ -23,28 +23,31 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	[data-theme="light"] { --bg: #f8f8f8; --text: #333; --link: #2980b9; --sidebar-bg: #f0f0f0; --border: #e1e4e8; --heading: #1a1a1a; --muted: #888888; --card-bg: #ffffff; }
 	* { box-sizing: border-box; }
 	body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; margin: 0; background: var(--bg); color: var(--text); }
-	.layout { display: grid; grid-template-columns: 1fr 2fr 1fr; width: 100%; max-width: 100vw; align-items: start; }
+	.sidebar-layout { display: flex; min-height: 100vh; }
+	.layout { flex: 1; display: grid; grid-template-columns: 2fr 1fr; width: 100%; max-width: 100vw; align-items: start; }
 	/* Mobile nav toggle */
 	.mobile-nav-toggle { display: none; }
 	.mobile-header { display: none; }
 	@media (max-width: 768px) {
 		.mobile-nav-toggle { display: block; background: var(--sidebar-bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 12px; font-size: 1.2em; cursor: pointer; }
-		.mobile-header { position: fixed; top: 0; left: 0; right: 0; z-index: 998; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--sidebar-bg); border-bottom: 1px solid var(--border); }
+		.mobile-header { position: fixed; top: 0; left: 0; right: 0; z-index: 1001; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--sidebar-bg); border-bottom: 1px solid var(--border); }
 		.mobile-header .mobile-site-name { flex: 1; font-size: 1em; font-weight: 600; color: var(--heading); margin: 0; padding: 0; border: none; }
-		.layout { grid-template-columns: 1fr; }
+		.sidebar-layout { display: block; }
+		.layout { grid-template-columns: 1fr; padding-top: 52px; }
 		.sidebar-nav {
-			position: fixed; top: 0; left: 0; height: 100vh; width: 280px; z-index: 1000;
+			display: none;
+			position: fixed; top: 52px; left: 0; right: 0; bottom: 0; width: 100vw; z-index: 1000;
 			transform: translateX(-100%); transition: transform 0.25s ease;
-			box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+			box-shadow: none;
 		}
-		.sidebar-nav.open { transform: translateX(0); }
-		.sidebar-nav.closed { transform: translateX(-100%); }
+		.sidebar-nav.open { display: block; transform: translateX(0); }
+		.sidebar-nav.closed { display: block; transform: translateX(-100%); }
 		.content-col { padding: 16px 20px; align-self: start; }
 		.sidebar-right { display: block; border-left: none; border-top: 1px solid var(--border); position: static; margin-top: 0; }
 		.sidebar-right .sidebar-section { margin-bottom: 8px; }
 	}
 	/* Left sidebar — nav */
-	.sidebar-nav { background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+	.sidebar-nav { width: 280px; flex-shrink: 0; background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 	.sidebar-nav h2 { margin: 0 0 12px; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 	.nav-tree { font-size: 0.9em; }
 	.nav-folder { margin: 4px 0; }
@@ -81,7 +84,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.graph-header button:hover { color: var(--text); }
 	.close-nav { display: none; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1em; padding: 0; }
 	@media (max-width: 768px) {
-		.close-nav { display: block; }
+
 	}
 	.full-graph-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center; }
 	.full-graph-modal { background: var(--sidebar-bg); border: 1px solid var(--border); border-radius: 8px; width: 90vw; height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -155,18 +158,19 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         <button id="mobile-nav-toggle" class="mobile-nav-toggle" aria-label="Toggle navigation">☰</button>
         <span class="mobile-site-name">%[12]s</span>
     </div>
-<div class="layout">
-    <aside class="sidebar-nav">
-        <div class="site-name">%[12]s</div>
-        <div class="sidebar-header">
-            <button id="close-nav" class="close-nav" aria-label="Close navigation">✕</button>
-            <h2>Browse</h2>
-            <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">&#9788;</button>
-        </div>
-        <button id="open-search" class="search-bar" type="button">Search <span class="icon">&#8981;</span></button>
-        <nav class="nav-tree" id="nav-tree"></nav>
-    </aside>
-    <main class="content-col">
+    <div class="sidebar-layout">
+        <aside class="sidebar-nav">
+            <div class="site-name">%[12]s</div>
+            <div class="sidebar-header">
+                <h2>Browse</h2>
+                <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">&#9788;</button>
+            </div>
+            <button id="open-search" class="search-bar" type="button">Search <span class="icon">&#8981;</span></button>
+            <nav class="nav-tree" id="nav-tree"></nav>
+        </aside>
+
+        <div class="layout">
+        <main class="content-col">
         <h1>%[1]s</h1>
         <div class="page-meta">
             <span class="page-meta-left">%[4]s</span>
@@ -186,6 +190,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         %[8]s
         %[9]s
     </aside>
+        </div>
 </div>
 <script>
 window.siteName = %[14]s;
@@ -194,7 +199,15 @@ window.siteName = %[14]s;
     var closeNav = document.getElementById('close-nav');
     var sidebarNav = document.querySelector('.sidebar-nav');
     if (navToggle) {
-        navToggle.addEventListener('click', function() { sidebarNav.classList.toggle('open'); sidebarNav.classList.remove('closed'); });
+        navToggle.addEventListener('click', function() {
+            if (sidebarNav.classList.contains('open')) {
+                sidebarNav.classList.remove('open');
+                sidebarNav.classList.add('closed');
+            } else {
+                sidebarNav.classList.remove('closed');
+                sidebarNav.classList.add('open');
+            }
+        });
     }
     if (closeNav) {
         closeNav.addEventListener('click', function() { sidebarNav.classList.remove('open'); sidebarNav.classList.add('closed'); });
