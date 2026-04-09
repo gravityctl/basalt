@@ -81,7 +81,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.graph-header button:hover { color: var(--text); }
 	.close-nav { display: none; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1em; padding: 0; }
 	@media (max-width: 768px) {
-		.close-nav { display: block; }
+
 	}
 	.full-graph-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center; }
 	.full-graph-modal { background: var(--sidebar-bg); border: 1px solid var(--border); border-radius: 8px; width: 90vw; height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
