@@ -31,15 +31,14 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 		.mobile-nav-toggle { display: block; background: var(--sidebar-bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 12px; font-size: 1.2em; cursor: pointer; }
 		.mobile-header { position: fixed; top: 0; left: 0; right: 0; z-index: 1001; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--sidebar-bg); border-bottom: 1px solid var(--border); }
 		.mobile-header .mobile-site-name { flex: 1; font-size: 1em; font-weight: 600; color: var(--heading); margin: 0; padding: 0; border: none; }
-		.layout { display: flex; flex-direction: column; }
+		.layout { grid-template-columns: 1fr; padding-top: 52px; }
 		.sidebar-nav {
-			display: none;
-			position: fixed; top: 0; bottom: 0; left: 0; width: 280px; z-index: 1000;
+			position: fixed; top: 52px; left: 0; right: 0; bottom: 0; width: 100vw; z-index: 1000;
 			transform: translateX(-100%); transition: transform 0.25s ease;
 			box-shadow: 2px 0 8px rgba(0,0,0,0.3);
 		}
-		.sidebar-nav.open { display: block; transform: translateX(0); }
-		.sidebar-nav.closed { display: block; transform: translateX(-100%); }
+		.sidebar-nav.open { transform: translateX(0); }
+		.sidebar-nav.closed { transform: translateX(-100%); }
 		.content-col { padding: 16px 20px; align-self: start; }
 		.sidebar-right { display: block; border-left: none; border-top: 1px solid var(--border); position: static; margin-top: 0; }
 		.sidebar-right .sidebar-section { margin-bottom: 8px; }
@@ -119,7 +118,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.toc-item.level-6 { padding-left: 60px; }
 	/* Theme toggle */
 	.site-name { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 12px; font-size: 1.5em; font-weight: 700; color: var(--heading); padding-left: 6px; }
-	.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+	.sidebar-header { display: flex; justify-content: flex-start; align-items: center; margin-bottom: 12px; }
 	.search-bar { width: 100%; background: var(--card-bg); border: 1px solid var(--border); color: var(--muted); cursor: pointer; padding: 6px 10px; border-radius: 4px; font-size: 0.85em; text-align: left; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
 	.search-bar .icon { font-size: 2em; }
 	.search-bar:hover { border-color: var(--link); color: var(--text); }
@@ -160,7 +159,6 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
     <aside class="sidebar-nav">
         <div class="site-name">%[12]s</div>
         <div class="sidebar-header">
-            <button id="close-nav" class="close-nav" aria-label="Close navigation">✕</button>
             <h2>Browse</h2>
             <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">&#9788;</button>
         </div>
