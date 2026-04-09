@@ -24,7 +24,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	* { box-sizing: border-box; }
 	body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; margin: 0; background: var(--bg); color: var(--text); }
 	.sidebar-layout { display: flex; min-height: 100vh; }
-	.layout { display: grid; grid-template-columns: 1fr 1fr; width: 100%; max-width: 100vw; align-items: start; }
+	.layout { flex: 1; display: grid; grid-template-columns: 2fr 1fr; width: 100%; max-width: 100vw; align-items: start; }
 	/* Mobile nav toggle */
 	.mobile-nav-toggle { display: none; }
 	.mobile-header { display: none; }
@@ -47,7 +47,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 		.sidebar-right .sidebar-section { margin-bottom: 8px; }
 	}
 	/* Left sidebar — nav */
-	.sidebar-nav { background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; flex-shrink: 0; }
+	.sidebar-nav { width: 260px; flex-shrink: 0; background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 	.sidebar-nav h2 { margin: 0 0 12px; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 	.nav-tree { font-size: 0.9em; }
 	.nav-folder { margin: 4px 0; }
