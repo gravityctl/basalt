@@ -47,7 +47,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 		.sidebar-right .sidebar-section { margin-bottom: 8px; }
 	}
 	/* Left sidebar — nav */
-	.sidebar-nav { width: 260px; flex-shrink: 0; background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+	.sidebar-nav { width: 280px; flex-shrink: 0; background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 20px 16px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 	.sidebar-nav h2 { margin: 0 0 12px; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 	.nav-tree { font-size: 0.9em; }
 	.nav-folder { margin: 4px 0; }
@@ -121,7 +121,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 	.toc-item.level-6 { padding-left: 60px; }
 	/* Theme toggle */
 	.site-name { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 12px; font-size: 1.5em; font-weight: 700; color: var(--heading); padding-left: 6px; }
-	.sidebar-header { display: flex; justify-content: flex-start; align-items: center; margin-bottom: 12px; }
+	.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 	.search-bar { width: 100%; background: var(--card-bg); border: 1px solid var(--border); color: var(--muted); cursor: pointer; padding: 6px 10px; border-radius: 4px; font-size: 0.85em; text-align: left; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
 	.search-bar .icon { font-size: 2em; }
 	.search-bar:hover { border-color: var(--link); color: var(--text); }
