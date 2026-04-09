@@ -33,12 +33,13 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
 		.mobile-header .mobile-site-name { flex: 1; font-size: 1em; font-weight: 600; color: var(--heading); margin: 0; padding: 0; border: none; }
 		.layout { grid-template-columns: 1fr; padding-top: 52px; }
 		.sidebar-nav {
+			display: none;
 			position: fixed; top: 52px; left: 0; right: 0; bottom: 0; width: 100vw; z-index: 1000;
 			transform: translateX(-100%); transition: transform 0.25s ease;
-			box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+			box-shadow: none;
 		}
-		.sidebar-nav.open { transform: translateX(0); }
-		.sidebar-nav.closed { transform: translateX(-100%); }
+		.sidebar-nav.open { display: block; transform: translateX(0); }
+		.sidebar-nav.closed { display: block; transform: translateX(-100%); }
 		.content-col { padding: 16px 20px; align-self: start; }
 		.sidebar-right { display: block; border-left: none; border-top: 1px solid var(--border); position: static; margin-top: 0; }
 		.sidebar-right .sidebar-section { margin-bottom: 8px; }
@@ -155,8 +156,7 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         <button id="mobile-nav-toggle" class="mobile-nav-toggle" aria-label="Toggle navigation">☰</button>
         <span class="mobile-site-name">%[12]s</span>
     </div>
-<div class="layout">
-    <aside class="sidebar-nav">
+<aside class="sidebar-nav">
         <div class="site-name">%[12]s</div>
         <div class="sidebar-header">
             <h2>Browse</h2>
@@ -165,7 +165,9 @@ func generateHTMLTemplate(title string, htmlContent string, sourcePath string, p
         <button id="open-search" class="search-bar" type="button">Search <span class="icon">&#8981;</span></button>
         <nav class="nav-tree" id="nav-tree"></nav>
     </aside>
-    <main class="content-col">
+
+<div class="layout">
+        <main class="content-col">
         <h1>%[1]s</h1>
         <div class="page-meta">
             <span class="page-meta-left">%[4]s</span>
